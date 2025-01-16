@@ -42,6 +42,14 @@ jobs:
       - name: Install ini module for Node.js
         run: npm install ini
 
+      - name: Get latest REDAXO release
+        id: get_redaxo_release
+        run: |
+          RELEASE_URL=$(curl -s "https://api.github.com/repos/redaxo/redaxo/releases/latest" | jq -r ".tag_name")
+          echo "::set-output name=redaxo_version::$RELEASE_URL"
+          SHA=$(curl -Ls "https://github.com/redaxo/redaxo/releases/download/$RELEASE_URL/redaxo_$RELEASE_URL.zip" | shasum -a 1 | awk '{print $1}')
+          echo "::set-output name=redaxo_sha::$SHA"
+
       - name: Read and prepare Configuration from setup.ini
         id: config
         uses: actions/github-script@v7
@@ -69,10 +77,9 @@ jobs:
               }
             }
 
-            core.setOutput('redaxo_version', config.REDAXO_VERSION);
-            core.setOutput('redaxo_sha', config.REDAXO_SHA);
+            core.setOutput('redaxo_version', "${{ steps.get_redaxo_release.outputs.redaxo_version }}");
+            core.setOutput('redaxo_sha', "${{ steps.get_redaxo_release.outputs.redaxo_sha }}");
             core.setOutput('addons', JSON.stringify(addons));
-
 
       - name: Create temporary directories
         run: |
@@ -80,8 +87,8 @@ jobs:
 
       - name: Download REDAXO
         run: |
-          VERSION="${{ steps.config.outputs.redaxo_version }}"
-          SHA="${{ steps.config.outputs.redaxo_sha }}"
+          VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
+          SHA="${{ steps.get_redaxo_release.outputs.redaxo_sha }}"
           FILE="tmp/redaxo/redaxo_${VERSION}.zip"
           curl -Ls "https://github.com/redaxo/redaxo/releases/download/${VERSION}/redaxo_${VERSION}.zip" -o "${FILE}"
           echo "File SHA: $(sha1sum ${FILE})"
@@ -92,7 +99,7 @@ jobs:
 
       - name: Unzip REDAXO
         run: |
-          VERSION="${{ steps.config.outputs.redaxo_version }}"
+          VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
           FILE="tmp/redaxo/redaxo_${VERSION}.zip"
           unzip "${FILE}" -d public
 
@@ -159,7 +166,7 @@ jobs:
           rm -rf public/redaxo/src
           rm -rf setup
           rm -rf tmp
-
+        
       - name: Create Pull Request
         id: create_pr
         uses: peter-evans/create-pull-request@v5
@@ -170,4 +177,3 @@ jobs:
           body: "Automatischer Setup der REDAXO Struktur"
           base: ${{ github.head_ref || github.ref_name }}
           commit-message: "Setup REDAXO structure"
-          

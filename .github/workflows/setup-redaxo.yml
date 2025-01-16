@@ -170,4 +170,3 @@ jobs:
           body: "Automatischer Setup der REDAXO Struktur"
           base: ${{ github.head_ref || github.ref_name }}
           commit-message: "Setup REDAXO structure"
-          prune: false

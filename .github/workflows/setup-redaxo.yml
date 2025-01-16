@@ -59,28 +59,18 @@ jobs:
             const ini = require('ini');
             const configString = fs.readFileSync('./setup/setup.ini', 'utf-8');
             const config = ini.parse(configString);
-
-            const addons = [];
-            for (const key in config) {
-              if (key.startsWith('https://')) {
-                  const addonConfig = config[key];
-                if (addonConfig.ADDONS) {
-                    for (const addonKey in addonConfig.ADDONS) {
-                      if (typeof addonConfig.ADDONS[addonKey] === 'string') {
-                          addons.push(addonConfig.ADDONS[addonKey]);
-                      } else if (typeof addonKey === 'string' && addonConfig.ADDONS[addonKey] !== null){
-                        addons.push(`${addonKey}=${addonConfig.ADDONS[addonKey]}`);
-                      }
-
-                    }
-                }
-              }
-            }
-
             core.setOutput('redaxo_version', "${{ steps.get_redaxo_release.outputs.redaxo_version }}");
             core.setOutput('redaxo_sha', "${{ steps.get_redaxo_release.outputs.redaxo_sha }}");
-            core.setOutput('addons', JSON.stringify(addons));
 
+      - name: Read Addons from addons.json
+        id: read_addons
+        uses: actions/github-script@v7
+        with:
+            script: |
+              const fs = require('fs');
+              const addons = JSON.parse(fs.readFileSync('./addons.json', 'utf8'));
+              core.setOutput('addons', JSON.stringify(addons));
+            
       - name: Create temporary directories
         run: |
           mkdir -p tmp/redaxo
@@ -126,26 +116,17 @@ jobs:
 
       - name: Download and Install Addons
         run: |
-          CONFIG="${{ steps.config.outputs.addons }}"
-          echo "${CONFIG}"
-          echo "${{ steps.config.outputs.addons }}"
-          ADDONS=$(echo "${{ steps.config.outputs.addons }}" | jq -r ' .[] ')
-          echo $ADDONS
+          ADDONS="${{ steps.read_addons.outputs.addons }}"
+          echo "${ADDONS}"
           IFS=$'\n'
-          for addon in $ADDONS; do
-             echo "installing: $addon"
-             BASE_URL=$(echo "${{ steps.config.outputs.addons }}" | jq -r 'to_entries[] | .key| select(test("^https://"))' )
-             if [[ -z "$BASE_URL" ]]; then
-               BASE_URL=$(echo "${{ steps.config.outputs.addons }}" | jq -r 'to_entries[0] | .key| select(test("^https://"))' )
-             fi
+          for addon in $(echo "${ADDONS}" | jq -r '.[]'); do
+             echo "installing: $(echo "$addon" | jq -r '.name')"
+             BASE_URL=$(echo "$addon" | jq -r '.repository')
+             ADDON_NAME=$(echo "$addon" | jq -r '.name')
+             ADDON_REAL_NAME=$(echo "$addon" | jq -r '.realname')
 
 
-             ADDON_NAME=$(echo "$addon" | sed -E 's/([a-z0-9_-]+)=.+/\1/g')
-             ADDON_NAME=$(echo "$ADDON_NAME" | sed -E 's/[0-9]+//g')
-             ADDON_REAL_NAME=$(echo "$addon" | sed -E 's/[a-z0-9_-]+=([a-z0-9_-]+)/\1/g')
-             if [[ -z "$ADDON_REAL_NAME" ]]; then
-                ADDON_REAL_NAME="$ADDON_NAME"
-             fi
+             echo "BASE_URL: $BASE_URL"
              echo "ADDON_NAME: $ADDON_NAME"
              echo "ADDON_REAL_NAME: $ADDON_REAL_NAME"
 

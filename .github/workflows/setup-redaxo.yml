@@ -116,45 +116,44 @@ jobs:
 
       - name: Download and Install Addons
         run: |
-          ADDONS="${{ steps.read_addons.outputs.addons }}"
-          echo "${ADDONS}"
+          ADDONS_JSON="${{ steps.read_addons.outputs.addons }}"
+          echo "$ADDONS_JSON"
           IFS=$'\n'
-          for addon in $(echo "${ADDONS}" | jq -r '.[]'); do
-             echo "installing: $(echo "$addon" | jq -r '.name')"
-             BASE_URL=$(echo "$addon" | jq -r '.repository')
-             ADDON_NAME=$(echo "$addon" | jq -r '.name')
-             ADDON_REAL_NAME=$(echo "$addon" | jq -r '.realname')
+          
+          for addon in $(echo "$ADDONS_JSON" | jq -r '.[]'); do
+            echo "installing: $(echo "$addon" | jq -r '.name')"
+            BASE_URL=$(echo "$addon" | jq -r '.repository')
+            ADDON_NAME=$(echo "$addon" | jq -r '.name')
+            ADDON_REAL_NAME=$(echo "$addon" | jq -r '.realname')
 
-             echo "BASE_URL: $BASE_URL"
-             echo "ADDON_NAME: $ADDON_NAME"
-             echo "ADDON_REAL_NAME: $ADDON_REAL_NAME"
+            echo "BASE_URL: $BASE_URL"
+            echo "ADDON_NAME: $ADDON_NAME"
+            echo "ADDON_REAL_NAME: $ADDON_REAL_NAME"
 
-             RELEASE_URL="${BASE_URL}${ADDON_REAL_NAME}/releases/latest"
-             echo  "RELEASE_URL: $RELEASE_URL"
-             ZIP_URL=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL" | jq -r '.zipball_url')
-             echo  "ZIP_URL: $ZIP_URL"
+            RELEASE_URL="${BASE_URL}${ADDON_REAL_NAME}/releases/latest"
+            echo  "RELEASE_URL: $RELEASE_URL"
+            ZIP_URL=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL" | jq -r '.zipball_url')
+            echo  "ZIP_URL: $ZIP_URL"
              
-             curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REAL_NAME.zip"
-             unzip "tmp/$ADDON_REAL_NAME.zip" -d tmp
-             
-             ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REAL_NAME}-*")
-             if [[ -n "$ADDON_DIR" ]]; then
-               echo "Found addon dir: $ADDON_DIR"
-               mv "$ADDON_DIR" "src/addons/$ADDON_NAME"
-             else
-               echo "Addon directory not found for $ADDON_REAL_NAME"
-             fi
-             rm "tmp/$ADDON_REAL_NAME.zip"
-          done
+            curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REAL_NAME.zip"
+            unzip "tmp/$ADDON_REAL_NAME.zip" -d tmp
+
+            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REAL_NAME}-*")
+            if [[ -n "$ADDON_DIR" ]]; then
+              echo "Found addon dir: $ADDON_DIR"
+              mv "$ADDON_DIR" "src/addons/$ADDON_NAME"
+            else
+              echo "Addon directory not found for $ADDON_REAL_NAME"
+            fi
+            rm "tmp/$ADDON_REAL_NAME.zip"
+         done
         shell: bash
 
       - name: Remove temporary directories
         run: |
           rm -rf tmp/redaxo
           rm -rf setup
-          
           find tmp -maxdepth 1 -type d -exec rm -rf {} +
-          
         
       - name: Create Pull Request
         id: create_pr

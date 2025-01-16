@@ -10,7 +10,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref }} # checkout the PR branch if this workflow is triggered by a PR
+          ref: ${{ github.head_ref }}
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -162,7 +162,7 @@ jobs:
 
       - name: Create Pull Request
         id: create_pr
-        uses: peter-evans/create-or-update-pull-request@v5
+        uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.PAT_TOKEN }}
           branch: redaxo-setup

@@ -164,7 +164,7 @@ jobs:
         id: create_pr
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ secrets.PAT_TOKEN }}
+          token: ${{ github.token }}
           branch: redaxo-setup
           title: "Setup REDAXO structure"
           body: "Automatischer Setup der REDAXO Struktur"

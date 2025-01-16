@@ -1,0 +1,11 @@
+https://api.github.com/repos/FriendsOfREDAXO/adminer
+https://api.github.com/repos/FriendsOfREDAXO/developer
+https://api.github.com/repos/FriendsOfREDAXO/focuspoint
+https://api.github.com/repos/FriendsOfREDAXO/mblock
+https://api.github.com/repos/FriendsOfREDAXO/quick_navigation
+https://api.github.com/repos/tbaddade/redaxo_sprog
+https://api.github.com/repos/tbaddade/redaxo_url
+https://api.github.com/repos/tbaddade/redaxo_watson
+https://api.github.com/repos/yakamara/ydeploy
+https://api.github.com/repos/yakamara/yform
+https://api.github.com/repos/yakamara/redaxo_yrewrite

@@ -164,9 +164,17 @@ jobs:
         id: create_pr
         uses: peter-evans/create-pull-request@v5
         with:
-          token: ${{ github.token }}
+          token: ${{ secrets.PAT_TOKEN }}
           branch: redaxo-setup
           title: "Setup REDAXO structure"
           body: "Automatischer Setup der REDAXO Struktur"
           base: ${{ github.head_ref || github.ref_name }}
           commit-message: "Setup REDAXO structure"
+          
+      - name: Push to pull request branch with PAT
+        if: steps.create_pr.outputs.pull-request-number != ''
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}
+          git push origin redaxo-setup

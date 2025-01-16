@@ -70,22 +70,12 @@ jobs:
             core.setOutput('redaxo_version', "${{ steps.get_redaxo_release.outputs.redaxo_version }}");
             core.setOutput('redaxo_sha', "${{ steps.get_redaxo_release.outputs.redaxo_sha }}");
       
-      # 9. Addons aus JSON Datei einlesen
-      - name: Read Addons from addons.json
-        id: read_addons
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const addons = fs.readFileSync('./addons.json', 'utf8');
-            core.setOutput('addons', addons);
-
-      # 10. Temporäre Verzeichnisse erstellen
+      # 9. Temporäre Verzeichnisse erstellen
       - name: Create temporary directories
         run: |
           mkdir -p tmp/redaxo
 
-      # 11. REDAXO herunterladen
+      # 10. REDAXO herunterladen
       - name: Download REDAXO
         run: |
           VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
@@ -98,14 +88,14 @@ jobs:
             exit 1
           fi
 
-      # 12. REDAXO entpacken
+      # 11. REDAXO entpacken
       - name: Unzip REDAXO
         run: |
           VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
           FILE="tmp/redaxo/redaxo_${VERSION}.zip"
           unzip "${FILE}" -d public
 
-      # 13. Yakamara Ordnerstruktur erstellen
+      # 12. Yakamara Ordnerstruktur erstellen
       - name: Create Yakamara file structure
         run: |
           mkdir -p var
@@ -119,7 +109,7 @@ jobs:
           rm public/README.md
           rm public/README.de.md
 
-      # 14. Setup Dateien kopieren
+      # 13. Setup Dateien kopieren
       - name: Copy setup files
         run: |
           cp setup/addon.project.boot.php src/addons/project/boot.php
@@ -128,50 +118,42 @@ jobs:
           cp setup/index.frontend.php public/index.php
           cp setup/AppPathProvider.php src/AppPathProvider.php
 
-      # 15. Addons herunterladen und installieren
+      # 14. Addons herunterladen und installieren
       - name: Download and Install Addons
         run: |
-          ADDONS_JSON="${{ steps.read_addons.outputs.addons }}"
-          echo "$ADDONS_JSON"
-          IFS=$'\n'
-          
-          while read -r addon; do
-             echo "installing: $(echo "$addon" | jq -r '.name')"
-             BASE_URL=$(echo "$addon" | jq -r '.repository')
-             ADDON_NAME=$(echo "$addon" | jq -r '.name')
-             ADDON_REAL_NAME=$(echo "$addon" | jq -r '.realname')
-
-             echo "BASE_URL: $BASE_URL"
-             echo "ADDON_NAME: $ADDON_NAME"
-             echo "ADDON_REAL_NAME: $ADDON_REAL_NAME"
-
-             RELEASE_URL="${BASE_URL}${ADDON_REAL_NAME}/releases/latest"
+          while IFS= read -r addon_url; do
+            echo "installing addon: $addon_url"
+            
+             ADDON_NAME=$(echo "$addon_url" | sed -E 's/.*\\/([a-z0-9_-]+)$/\1/g')
+            
+             RELEASE_URL="$addon_url/releases/latest"
              echo  "RELEASE_URL: $RELEASE_URL"
              ZIP_URL=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL" | jq -r '.zipball_url')
              echo  "ZIP_URL: $ZIP_URL"
             
-             curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REAL_NAME.zip"
-             unzip "tmp/$ADDON_REAL_NAME.zip" -d tmp
+            curl -Ls "$ZIP_URL" -o "tmp/$ADDON_NAME.zip"
+            unzip "tmp/$ADDON_NAME.zip" -d tmp
 
-             ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REAL_NAME}-*")
-             if [[ -n "$ADDON_DIR" ]]; then
+            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_NAME}-*")
+            if [[ -n "$ADDON_DIR" ]]; then
                 echo "Found addon dir: $ADDON_DIR"
-                mv "$ADDON_DIR" "src/addons/$ADDON_NAME"
-             else
-                echo "Addon directory not found for $ADDON_REAL_NAME"
-             fi
-             rm "tmp/$ADDON_REAL_NAME.zip"
-          done < <(echo "$ADDONS_JSON" | jq -c '.[]')
+               mv "$ADDON_DIR" "src/addons/$ADDON_NAME"
+            else
+              echo "Addon directory not found for $ADDON_NAME"
+            fi
+             rm "tmp/$ADDON_NAME.zip"
+
+          done < addons.txt
         shell: bash
 
-      # 16. Temporäre Verzeichnisse entfernen
+      # 15. Temporäre Verzeichnisse entfernen
       - name: Remove temporary directories
         run: |
           rm -rf tmp/redaxo
           rm -rf setup
           find tmp -maxdepth 1 -type d -exec rm -rf {} +
-
-      # 17. Pull Request erstellen
+      
+      # 16. Pull Request erstellen
       - name: Create Pull Request
         id: create_pr
         uses: peter-evans/create-pull-request@v5

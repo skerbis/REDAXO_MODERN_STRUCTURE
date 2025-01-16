@@ -1,0 +1,126 @@
+name: Setup REDAXO
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: zip, curl, gd
+
+      - name: Download setup files from yakamara/yak
+        run: |
+          SETUP_URL="https://raw.githubusercontent.com/yakamara/yak/main/setup"
+          mkdir -p setup
+          curl -Ls "$SETUP_URL/setup.ini" -o setup/setup.ini
+          curl -Ls "$SETUP_URL/addon.project.boot.php" -o setup/addon.project.boot.php
+          curl -Ls "$SETUP_URL/console" -o setup/console
+          curl -Ls "$SETUP_URL/index.backend.php" -o setup/index.backend.php
+          curl -Ls "$SETUP_URL/index.frontend.php" -o setup/index.frontend.php
+          curl -Ls "$SETUP_URL/AppPathProvider.php" -o setup/AppPathProvider.php
+
+
+      - name: Read Configuration from setup.ini
+        id: config
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const ini = require('ini');
+            const configString = fs.readFileSync('./setup/setup.ini', 'utf-8');
+            const config = ini.parse(configString);
+
+            core.setOutput('redaxo_version', config.REDAXO_VERSION);
+            core.setOutput('redaxo_sha', config.REDAXO_SHA);
+            core.setOutput('addons', JSON.stringify(config));
+
+
+      - name: Create temporary directories
+        run: |
+          mkdir -p tmp/redaxo
+
+      - name: Download REDAXO
+        run: |
+          VERSION="${{ steps.config.outputs.redaxo_version }}"
+          SHA="${{ steps.config.outputs.redaxo_sha }}"
+          FILE="tmp/redaxo/redaxo_${VERSION}.zip"
+          curl -Ls "https://github.com/redaxo/redaxo/releases/download/${VERSION}/redaxo_${VERSION}.zip" -o "${FILE}"
+          echo "File SHA: $(sha1sum ${FILE})"
+          if [[ "$(sha1sum ${FILE} | awk '{print $1}')" != "${SHA}" ]]; then
+            echo "ERROR: SHA-Hash is incorrect."
+            exit 1
+          fi
+
+      - name: Unzip REDAXO
+        run: |
+          VERSION="${{ steps.config.outputs.redaxo_version }}"
+          FILE="tmp/redaxo/redaxo_${VERSION}.zip"
+          unzip "${FILE}" -d public
+
+      - name: Create Yakamara file structure
+        run: |
+          mkdir -p var
+          mkdir -p src
+          mv public/redaxo/bin/ bin
+          mv public/redaxo/cache var/cache
+          mv public/redaxo/data var/data
+          mv public/redaxo/src/addons src/addons
+          mv public/redaxo/src/core src/core
+          mv public/LICENSE.md LICENSE.md
+          rm public/README.md
+          rm public/README.de.md
+
+      - name: Copy setup files
+        run: |
+          cp setup/addon.project.boot.php src/addons/project/boot.php
+          cp setup/console bin/console
+          cp setup/index.backend.php public/redaxo/index.php
+          cp setup/index.frontend.php public/index.php
+          cp setup/AppPathProvider.php src/AppPathProvider.php
+
+      - name: Download and Install Addons
+        run: |
+          CONFIG="${{ steps.config.outputs.addons }}"
+          echo "${CONFIG}"
+          echo "${{ steps.config.outputs.addons }}"
+          ADDONS=$(echo "${{ steps.config.outputs.addons }}" | jq -r 'to_entries[] | .value | to_entries[] | select(.key == "ADDONS") | .value[] | to_entries[] | .value')
+          echo $ADDONS
+          IFS=$'\n'
+          for addon in $ADDONS; do
+             echo "installing: $addon"
+             BASE_URL=$(echo "$CONFIG" | jq -r 'to_entries[] | .key| select(test("^https://"))')
+
+             ADDON_NAME=$(echo "$addon" | sed -E 's/([a-z0-9_-]+)=.+/\1/g')
+             ADDON_NAME=$(echo "$ADDON_NAME" | sed -E 's/[0-9]+//g')
+             ADDON_REAL_NAME=$(echo "$addon" | sed -E 's/[a-z0-9_-]+=([a-z0-9_-]+)/\1/g')
+             if [[ -z "$ADDON_REAL_NAME" ]]; then
+                ADDON_REAL_NAME="$ADDON_NAME"
+             fi
+             echo "ADDON_NAME: $ADDON_NAME"
+             echo "ADDON_REAL_NAME: $ADDON_REAL_NAME"
+
+             RELEASE_URL="${BASE_URL}${ADDON_REAL_NAME}/releases/latest"
+             echo  "RELEASE_URL: $RELEASE_URL"
+             ZIP_URL=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL" | jq -r '.zipball_url')
+             echo  "ZIP_URL: $ZIP_URL"
+             curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REAL_NAME.zip"
+             unzip "tmp/$ADDON_REAL_NAME.zip" -d tmp
+             mv "$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REAL_NAME}-*")" "src/addons/$ADDON_NAME"
+             rm "tmp/$ADDON_REAL_NAME.zip"
+          done
+        shell: bash
+
+      - name: Remove temporary directories
+        run: |
+          rm -rf public/redaxo/bin
+          rm -rf public/redaxo/src
+          rm -rf setup
+          rm -rf tmp

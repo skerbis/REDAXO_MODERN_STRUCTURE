@@ -16,6 +16,16 @@ jobs:
           php-version: '8.1'
           extensions: zip, curl, gd
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Du kannst auch eine andere Node.js Version wählen
+
+      - name: Install Yarn
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yarn
+
       - name: Download setup files from yakamara/yak
         run: |
           SETUP_URL="https://raw.githubusercontent.com/yakamara/yak/main/setup"
@@ -27,6 +37,8 @@ jobs:
           curl -Ls "$SETUP_URL/index.frontend.php" -o setup/index.frontend.php
           curl -Ls "$SETUP_URL/AppPathProvider.php" -o setup/AppPathProvider.php
 
+      - name: Install ini module for Node.js
+        run: npm install ini
 
       - name: Read Configuration from setup.ini
         id: config
@@ -41,7 +53,6 @@ jobs:
             core.setOutput('redaxo_version', config.REDAXO_VERSION);
             core.setOutput('redaxo_sha', config.REDAXO_SHA);
             core.setOutput('addons', JSON.stringify(config));
-
 
       - name: Create temporary directories
         run: |

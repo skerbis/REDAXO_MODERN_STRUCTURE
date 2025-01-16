@@ -19,7 +19,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Du kannst auch eine andere Node.js Version wählen
+          node-version: '20'
 
       - name: Install Yarn
         run: |
@@ -40,7 +40,7 @@ jobs:
       - name: Install ini module for Node.js
         run: npm install ini
 
-      - name: Read Configuration from setup.ini
+      - name: Read and prepare Configuration from setup.ini
         id: config
         uses: actions/github-script@v7
         with:
@@ -50,9 +50,27 @@ jobs:
             const configString = fs.readFileSync('./setup/setup.ini', 'utf-8');
             const config = ini.parse(configString);
 
+            const addons = [];
+            for (const key in config) {
+              if (key.startsWith('https://')) {
+                  const addonConfig = config[key];
+                if (addonConfig.ADDONS) {
+                    for (const addonKey in addonConfig.ADDONS) {
+                      if (typeof addonConfig.ADDONS[addonKey] === 'string') {
+                          addons.push(addonConfig.ADDONS[addonKey]);
+                      } else if (typeof addonKey === 'string' && addonConfig.ADDONS[addonKey] !== null){
+                        addons.push(`${addonKey}=${addonConfig.ADDONS[addonKey]}`);
+                      }
+
+                    }
+                }
+              }
+            }
+
             core.setOutput('redaxo_version', config.REDAXO_VERSION);
             core.setOutput('redaxo_sha', config.REDAXO_SHA);
-            core.setOutput('addons', JSON.stringify(config));
+            core.setOutput('addons', JSON.stringify(addons));
+
 
       - name: Create temporary directories
         run: |
@@ -102,12 +120,16 @@ jobs:
           CONFIG="${{ steps.config.outputs.addons }}"
           echo "${CONFIG}"
           echo "${{ steps.config.outputs.addons }}"
-          ADDONS=$(echo "${{ steps.config.outputs.addons }}" | jq -r 'to_entries[] | .value | to_entries[] | select(.key == "ADDONS") | .value[] | to_entries[] | .value')
+          ADDONS=$(echo "${{ steps.config.outputs.addons }}" | jq -r ' .[] ')
           echo $ADDONS
           IFS=$'\n'
           for addon in $ADDONS; do
              echo "installing: $addon"
-             BASE_URL=$(echo "$CONFIG" | jq -r 'to_entries[] | .key| select(test("^https://"))')
+             BASE_URL=$(echo "${{ steps.config.outputs.addons }}" | jq -r 'to_entries[] | .key| select(test("^https://"))' )
+             if [[ -z "$BASE_URL" ]]; then
+               BASE_URL=$(echo "${{ steps.config.outputs.addons }}" | jq -r 'to_entries[0] | .key| select(test("^https://"))' )
+             fi
+
 
              ADDON_NAME=$(echo "$addon" | sed -E 's/([a-z0-9_-]+)=.+/\1/g')
              ADDON_NAME=$(echo "$ADDON_NAME" | sed -E 's/[0-9]+//g')

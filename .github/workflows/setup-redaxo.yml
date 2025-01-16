@@ -125,7 +125,6 @@ jobs:
              ADDON_NAME=$(echo "$addon" | jq -r '.name')
              ADDON_REAL_NAME=$(echo "$addon" | jq -r '.realname')
 
-
              echo "BASE_URL: $BASE_URL"
              echo "ADDON_NAME: $ADDON_NAME"
              echo "ADDON_REAL_NAME: $ADDON_REAL_NAME"
@@ -136,7 +135,13 @@ jobs:
              echo  "ZIP_URL: $ZIP_URL"
              curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REAL_NAME.zip"
              unzip "tmp/$ADDON_REAL_NAME.zip" -d tmp
-             mv "$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REAL_NAME}-*")" "src/addons/$ADDON_NAME"
+
+             ADDON_DIR=$(find tmp -type d -name "*-${ADDON_REAL_NAME}-*" )
+             if [[ -n "$ADDON_DIR" ]]; then
+              mv "$ADDON_DIR" "src/addons/$ADDON_NAME"
+             else
+                 echo "Addon directory not found for $ADDON_REAL_NAME"
+             fi
              rm "tmp/$ADDON_REAL_NAME.zip"
           done
         shell: bash

@@ -69,7 +69,7 @@ jobs:
             const config = ini.parse(configString);
             core.setOutput('redaxo_version', "${{ steps.get_redaxo_release.outputs.redaxo_version }}");
             core.setOutput('redaxo_sha', "${{ steps.get_redaxo_release.outputs.redaxo_sha }}");
-      
+
       # 9. Temporäre Verzeichnisse erstellen
       - name: Create temporary directories
         run: |
@@ -123,26 +123,27 @@ jobs:
         run: |
           while IFS= read -r addon_url; do
             echo "installing addon: $addon_url"
-            
-             ADDON_NAME=$(echo "$addon_url" | sed -E 's/.*\\/([a-z0-9_-]+)$/\1/g')
-            
-             RELEASE_URL="$addon_url/releases/latest"
-             echo  "RELEASE_URL: $RELEASE_URL"
-             ZIP_URL=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL" | jq -r '.zipball_url')
-             echo  "ZIP_URL: $ZIP_URL"
-            
-            curl -Ls "$ZIP_URL" -o "tmp/$ADDON_NAME.zip"
-            unzip "tmp/$ADDON_NAME.zip" -d tmp
+             
+            ADDON_NAME=$(echo "$addon_url" | sed -E 's/.*\///g')
+             
+            ADDON_REAL_NAME=$(echo "$addon_url" | sed -E 's/.*\///g')
 
-            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_NAME}-*")
+            RELEASE_URL="$addon_url/releases/latest"
+            echo  "RELEASE_URL: $RELEASE_URL"
+            ZIP_URL=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL" | jq -r '.zipball_url')
+            echo  "ZIP_URL: $ZIP_URL"
+             
+            curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REAL_NAME.zip"
+            unzip "tmp/$ADDON_REAL_NAME.zip" -d tmp
+
+            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REAL_NAME}-*")
             if [[ -n "$ADDON_DIR" ]]; then
                 echo "Found addon dir: $ADDON_DIR"
                mv "$ADDON_DIR" "src/addons/$ADDON_NAME"
             else
-              echo "Addon directory not found for $ADDON_NAME"
+                echo "Addon directory not found for $ADDON_REAL_NAME"
             fi
-             rm "tmp/$ADDON_NAME.zip"
-
+             rm "tmp/$ADDON_REAL_NAME.zip"
           done < addons.txt
         shell: bash
 
@@ -152,7 +153,7 @@ jobs:
           rm -rf tmp/redaxo
           rm -rf setup
           find tmp -maxdepth 1 -type d -exec rm -rf {} +
-      
+
       # 16. Pull Request erstellen
       - name: Create Pull Request
         id: create_pr

@@ -1,0 +1,57 @@
+[
+    {
+        "name": "adminer",
+        "repository": "https://api.github.com/repos/FriendsOfREDAXO/",
+        "realname": "adminer"
+    },
+    {
+        "name": "developer",
+         "repository": "https://api.github.com/repos/FriendsOfREDAXO/",
+        "realname": "developer"
+    },
+    {
+         "name": "focuspoint",
+         "repository": "https://api.github.com/repos/FriendsOfREDAXO/",
+        "realname": "focuspoint"
+    },
+        {
+         "name": "mblock",
+         "repository": "https://api.github.com/repos/FriendsOfREDAXO/",
+        "realname": "mblock"
+    },
+        {
+         "name": "quick_navigation",
+         "repository": "https://api.github.com/repos/FriendsOfREDAXO/",
+         "realname": "quick_navigation"
+    },
+    {
+        "name": "sprog",
+         "repository": "https://api.github.com/repos/tbaddade/",
+        "realname": "redaxo_sprog"
+    },
+     {
+        "name": "url",
+         "repository": "https://api.github.com/repos/tbaddade/",
+        "realname": "redaxo_url"
+    },
+    {
+        "name": "watson",
+         "repository": "https://api.github.com/repos/tbaddade/",
+        "realname": "redaxo_watson"
+    },
+    {
+       "name": "ydeploy",
+       "repository": "https://api.github.com/repos/yakamara/",
+        "realname": "ydeploy"
+    },
+        {
+        "name": "yform",
+       "repository": "https://api.github.com/repos/yakamara/",
+        "realname": "yform"
+    },
+    {
+         "name": "yrewrite",
+        "repository": "https://api.github.com/repos/yakamara/",
+         "realname": "redaxo_yrewrite"
+    }
+]

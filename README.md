@@ -1,3 +1,58 @@
+**README.md:**
+
+# REDAXO Setup Action
+
+Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit einer bestimmten Ordnerstruktur und der Möglichkeit, Addons zu installieren. Die Action ist für die manuelle Ausführung konzipiert.
+
+## Funktionsweise
+
+Die Action führt folgende Schritte aus:
+
+1.  **Checkout Repository:** Checkt den aktuellen Code des Repository aus.
+2.  **PHP Umgebung einrichten:** Richtet eine PHP 8.1 Umgebung mit den benötigten Extensions (zip, curl, gd) ein.
+3.  **Node.js installieren:** Installiert Node.js
+4.  **Yarn installieren:** Installiert Yarn
+5.  **Setup Dateien herunterladen:** Lädt die benötigten Setup Dateien (`setup.ini`, `addon.project.boot.php`, `console`, `index.backend.php`, `index.frontend.php`, `AppPathProvider.php`) aus dem `yakamara/yak` Repository herunter.
+6.  **ini Modul installieren:** Installiert das `ini` Modul für Node.js, um die INI Datei auszulesen.
+7.  **Neueste REDAXO Version ermitteln:** Ermittelt die neueste verfügbare REDAXO Version von der Github API.
+8.  **Konfiguration einlesen:** Liest die `setup.ini` Datei aus und speichert die REDAXO Version und die SHA Summe.
+9.  **Addons einlesen:** Liest die Liste der Addons aus der `addons.txt` Datei.
+10. **Temporäre Verzeichnisse erstellen:** Erstellt temporäre Verzeichnisse für die Bearbeitung.
+11. **REDAXO herunterladen:** Lädt die REDAXO ZIP Datei der aktuellen Version herunter.
+12. **REDAXO entpacken:** Entpackt die REDAXO ZIP Datei in das `public` Verzeichnis.
+13. **Yakamara Ordnerstruktur erstellen:** Erstellt die spezifische Ordnerstruktur für Yakamara.
+14. **Setup Dateien kopieren:** Kopiert die notwendigen Setup Dateien an die richtige Position.
+15. **Addons herunterladen und installieren:** Lädt die konfigurierten Addons aus der `addons.txt` Datei herunter und installiert sie in das `src/addons` Verzeichnis.
+16. **Temporäre Verzeichnisse entfernen:** Entfernt alle temporären Verzeichnisse.
+17. **Pull Request erstellen:** Erstellt einen Pull Request mit den erstellten Änderungen.
+
+## Konfiguration
+
+### Eingabeparameter
+
+Diese Action hat keine Eingabeparameter. Die Konfiguration wird über Dateien im Repository gesteuert.
+
+### Dateien
+
+*   **`.github/workflows/setup-redaxo.yml`**: Die Workflow Datei der Action, die im Root des Projekts erstellt werden muss.
+*   **`setup.ini`**: Die Datei enthält die Konfiguration der REDAXO Version. Diese Datei wird aus dem `yakamara/yak` Repository heruntergeladen, kann aber im Bedarfsfall auch angepasst werden.
+*  **`addons.txt`**: Eine Textdatei, die die URLs der Addon Repositories enthält. Jede URL steht in einer neuen Zeile. Diese muss im Root des Repository angelegt werden.
+
+#### Beispiel für `addons.txt`
+
+```
+https://api.github.com/repos/FriendsOfREDAXO/adminer
+https://api.github.com/repos/FriendsOfREDAXO/developer
+https://api.github.com/repos/FriendsOfREDAXO/focuspoint
+https://api.github.com/repos/FriendsOfREDAXO/mblock
+https://api.github.com/repos/FriendsOfREDAXO/quick_navigation
+https://api.github.com/repos/tbaddade/redaxo_sprog
+https://api.github.com/repos/tbaddade/redaxo_url
+https://api.github.com/repos/tbaddade/redaxo_watson
+https://api.github.com/repos/yakamara/ydeploy
+https://api.github.com/repos/yakamara/yform
+https://api.github.com/repos/yakamara/redaxo_yrewrite
+```
 
 ## Verwendung
 
@@ -202,3 +257,5 @@ Beiträge und Verbesserungsvorschläge sind herzlich willkommen!
 ## Lizenz
 
 Diese Action ist unter der [MIT Lizenz](https://opensource.org/licenses/MIT) lizenziert.
+
+

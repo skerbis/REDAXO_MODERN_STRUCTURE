@@ -1,4 +1,4 @@
-# REDAXO Setup Action
+# REDAXO Distro-Builder inspired by YAK
 
 Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit einer bestimmten Ordnerstruktur und der Möglichkeit, Addons zu installieren. Die Action ist für die manuelle Ausführung konzipiert.
 

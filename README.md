@@ -1,5 +1,3 @@
-**README.md:**
-
 # REDAXO Setup Action
 
 Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit einer bestimmten Ordnerstruktur und der Möglichkeit, Addons zu installieren. Die Action ist für die manuelle Ausführung konzipiert.

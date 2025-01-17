@@ -147,73 +147,14 @@ jobs:
           done < addons.txt
         shell: bash
 
-      # 15. Google Fonts herunterladen und CSS generieren
-      - name: Download Google Fonts and Generate CSS
-        run: |
-          mkdir -p assets/fonts
-          if [ -f fonts.txt ]; then
-            echo "@font-face {" > assets/fonts/fonts.css
-            while IFS= read -r font_url; do
-              echo "Processing font: $font_url"
-              
-               # Extract font family from URL (needs adjustment based on the URL)
-              FONT_FAMILY=$(echo "$font_url" | sed -E 's/.*family=([^&]*)&.*/\1/' | sed 's/\+/ /g')
-              if [[ -z "$FONT_FAMILY" ]]; then
-                FONT_FAMILY=$(echo "$font_url" | sed -E 's/.*family=([^&]*).*/\1/' | sed 's/\+/ /g')
-                 if [[ -z "$FONT_FAMILY" ]]; then
-                   echo "Warning: Could not extract font family. Skipping $font_url"
-                   continue;
-                 fi
-              fi
-              FONT_FAMILY=$(echo "$FONT_FAMILY" | sed -E 's/%20/ /g')
-              
-                
-               # Use google fonts API to get WOFF2
-              GOOGLE_FONTS_API_URL="https://fonts.googleapis.com/css2?family=$(echo "$FONT_FAMILY" | sed 's/ /+/g')&display=swap"
-              echo "  API URL: $GOOGLE_FONTS_API_URL"
-
-              FONT_CSS=$(curl -s -H 'User-Agent: Mozilla/5.0' "$GOOGLE_FONTS_API_URL")
-
-              # Extract WOFF2 and WOFF url's
-              WOFF2_URL=$(echo "$FONT_CSS" | grep -oP 'url\(([^)]*\.woff2)\)' | grep -oP 'url\(([^)]*)\)' | sed 's/url\((.*)\)/\1/')
-              WOFF_URL=$(echo "$FONT_CSS" | grep -oP 'url\(([^)]*\.woff)\)' | grep -oP 'url\(([^)]*)\)' | sed 's/url\((.*)\)/\1/')
-
-              # Download Fonts
-              if [[ -n "$WOFF2_URL" ]]; then
-                curl -Ls "$WOFF2_URL" -o "assets/fonts/${FONT_FAMILY// /_}.woff2"
-              fi
-              if [[ -n "$WOFF_URL" ]]; then
-                curl -Ls "$WOFF_URL" -o "assets/fonts/${FONT_FAMILY// /_}.woff"
-              fi
-
-              # Append @font-face to the css
-              echo "@font-face {" >> assets/fonts/fonts.css
-              echo "  font-family: '$FONT_FAMILY';" >> assets/fonts/fonts.css
-              if [[ -n "$WOFF2_URL" ]]; then
-                echo "  src: url('${FONT_FAMILY// /_}.woff2') format('woff2');" >> assets/fonts/fonts.css
-              fi
-              if [[ -n "$WOFF_URL" ]]; then
-                  echo "  src: url('${FONT_FAMILY// /_}.woff') format('woff');" >> assets/fonts/fonts.css
-              fi
-              echo "  font-weight: normal;" >> assets/fonts/fonts.css
-              echo "  font-style: normal;" >> assets/fonts/fonts.css
-              echo "}" >> assets/fonts/fonts.css
-              echo "" >> assets/fonts/fonts.css
-
-            done < fonts.txt
-            echo "}" >> assets/fonts/fonts.css
-           else
-              echo "No fonts.txt file found. Skipping font download and CSS generation."
-          fi
-
-      # 16. Temporäre Verzeichnisse entfernen
+      # 15. Temporäre Verzeichnisse entfernen
       - name: Remove temporary directories
         run: |
           rm -rf tmp/redaxo
           rm -rf setup
           find tmp -maxdepth 1 -type d -exec rm -rf {} +
 
-      # 17. Pull Request erstellen
+      # 16. Pull Request erstellen
       - name: Create Pull Request
         id: create_pr
         uses: peter-evans/create-pull-request@v5

@@ -152,8 +152,8 @@ jobs:
         run: |
           TEMP_FONTS_DIR="tmp_fonts"
           mkdir -p "$TEMP_FONTS_DIR"
-
-          YARN_ADD="yarn add webpack webpack-cli google-fonts-webpack-plugin"
+          # Specify a version of the plugin that is compatible with webpack 5
+          YARN_ADD="yarn add webpack webpack-cli google-fonts-webpack-plugin@0.4.2"
           echo "Yarn Install via: $YARN_ADD"
           eval $YARN_ADD
 

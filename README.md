@@ -278,14 +278,9 @@ Die neue Ordnerstruktur zielt darauf ab, eine moderne Basis für REDAXO-Projekte
 │   ├── cache/             # Cache Dateien
 │   ├── data/             # Daten Dateien
 │   └── log/              # Log Dateien
-├── .env                   # Umgebungsvariablen
 ├── .gitignore             # Git Ignorier Datei
-├── deploy.php           # Deploy Datei
 ├── LICENSE                # Lizenzdatei
 ├── package.json           # Node.js Package Datei
-├── postcss.config.js   # PostCSS Konfigurationsdatei
-├── README.md              # Readme Datei
-├── webpack.config.js      # Webpack Konfigurationsdatei
 └── addons.txt             # Liste der Addon URLs
 ```
 
@@ -315,22 +310,14 @@ Die neue Ordnerstruktur zielt darauf ab, eine moderne Basis für REDAXO-Projekte
     *   **`cache/`**: Enthält Cache-Dateien.
     *   **`data/`**: Enthält Daten-Dateien.
     *   **`log/`**: Enthält Log-Dateien.
-*   **`.env`**:
-    *   Enthält Umgebungsvariablen, die in der Anwendung verwendet werden.
 *   **`.gitignore`**:
-    *  Definiert Dateien und Ordner, die von Git ignoriert werden sollen.
-*   **`deploy.php`**:
-    *   Eine Datei für die Bereitstellung der Anwendung.
+    *  Definiert Dateien und Ordner, die von Git ignoriert werden sollen..
 *   **`LICENSE`**:
     *   Die Lizenzdatei des Projekts.
 *   **`package.json`**:
     *   Eine Datei, die Informationen über die Node.js-Pakete enthält, die in deinem Projekt verwendet werden.
-*   **`postcss.config.js`**:
-    *   Eine Konfigurationsdatei für PostCSS.
 *   **`README.md`**:
-    *   Die Readme-Datei des Projekts.
-*   **`webpack.config.js`**:
-    *   Eine Konfigurationsdatei für Webpack.
+    *   Die Readme-Datei des Projekts..
 *   **`addons.txt`**:
     *   Eine Textdatei, die eine Liste von Addon-URLs enthält. Jede URL steht in einer neuen Zeile.
 

@@ -33,7 +33,6 @@ Diese Action hat keine Eingabeparameter. Die Konfiguration wird über Dateien im
 ### Dateien
 
 *   **`.github/workflows/setup-redaxo.yml`**: Die Workflow Datei der Action, die im Root des Projekts erstellt werden muss.
-*   **`setup.ini`**: Die Datei enthält die Konfiguration der REDAXO Version. Diese Datei wird aus dem `yakamara/yak` Repository heruntergeladen, kann aber im Bedarfsfall auch angepasst werden.
 *  **`addons.txt`**: Eine Textdatei, die die URLs der Addon Repositories enthält. Jede URL steht in einer neuen Zeile. Diese muss im Root des Repository angelegt werden.
 
 #### Beispiel für `addons.txt`

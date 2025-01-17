@@ -11,5 +11,5 @@ https://api.github.com/repos/tbaddade/redaxo_url
 https://api.github.com/repos/tbaddade/redaxo_watson
 https://api.github.com/repos/yakamara/yform
 https://api.github.com/repos/yakamara/redaxo_yrewrite
-https://api.github.com/repos/lxm/filepond
+https://api.github.com/repos/klxm/filepond
 https://api.github.com/repos/FriendsOfREDAXO/quick_navigation

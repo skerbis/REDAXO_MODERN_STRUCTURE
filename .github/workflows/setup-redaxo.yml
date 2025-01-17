@@ -147,79 +147,14 @@ jobs:
           done < addons.txt
         shell: bash
 
-      # 15. Install Node Modules via Yarn and run Webpack on the fly
-      - name: Install Node Modules via Yarn and Run Webpack
-        run: |
-          TEMP_FONTS_DIR="tmp_fonts"
-          mkdir -p "$TEMP_FONTS_DIR"
-          # Specify a version of the plugin that is compatible with webpack 5
-          YARN_ADD="yarn add webpack webpack-cli google-fonts-webpack-plugin@0.4.2"
-          echo "Yarn Install via: $YARN_ADD"
-          eval $YARN_ADD
-
-          # Use the same google-fonts.config.js from your repository
-
-          GOOGLE_FONT_CONFIG=$(cat <<EOF
-          const path = require('path');
-          module.exports = {
-              fonts: [
-                  { family: 'Open Sans' },
-                  { family: 'Roboto' },
-                  { family: 'Lato', variants: ['400', '700'] },
-              ],
-              outputPath: '$TEMP_FONTS_DIR',
-              outputFilename: 'fonts.css',
-          };
-          EOF
-          )
-          echo "$GOOGLE_FONT_CONFIG" > google-fonts.config.js
-
-          # Create a dynamic webpack.config.js
-          WEBPACK_CONFIG=$(cat <<EOF
-          const GoogleFontsPlugin = require('google-fonts-webpack-plugin');
-          const path = require('path');
-          const googleFontsConfig = require('./google-fonts.config.js');
-          module.exports = {
-            mode: 'production',
-              entry: './src/index.js',
-              output: {
-                filename: 'bundle.js',
-                path: path.resolve(__dirname, 'dist'),
-              },
-              plugins: [
-              new GoogleFontsPlugin({
-                      fonts: googleFontsConfig.fonts,
-                      filename: path.join(googleFontsConfig.outputPath, googleFontsConfig.outputFilename),
-              }),
-            ],
-          };
-          EOF
-          )
-          echo "$WEBPACK_CONFIG" > webpack.config.js
-
-          echo "Starting Webpack Build"
-          npx webpack
-
-      # 16. Move the fonts files to public/assets/fonts
-      - name: Move the fonts files to public/assets/fonts
-        run: |
-          TEMP_FONTS_DIR="tmp_fonts"
-          mkdir -p public/assets/fonts
-          mv "$TEMP_FONTS_DIR"/* public/assets/fonts
-
-     # 17. Temporäre Verzeichnisse entfernen
+      # 15. Temporäre Verzeichnisse entfernen
       - name: Remove temporary directories
         run: |
           rm -rf tmp/redaxo
           rm -rf setup
           find tmp -maxdepth 1 -type d -exec rm -rf {} +
-          rm -rf dist
-          rm google-fonts.config.js
-          rm webpack.config.js
-          rm yarn.lock
-          rm -rf "$TEMP_FONTS_DIR"
 
-      # 18. Pull Request erstellen
+      # 16. Pull Request erstellen
       - name: Create Pull Request
         id: create_pr
         uses: peter-evans/create-pull-request@v5

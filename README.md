@@ -248,6 +248,96 @@ https://api.github.com/repos/yakamara/redaxo_yrewrite
 *   Der `PAT_TOKEN` muss Schreibzugriff auf dein Repository haben.
 *   Die Addon URLs in der `addons.txt` Datei müssen vollständig und korrekt sein und zu einem gültigen Github Repository führen.
 
+
+## Das Ergebnis 
+
+
+**Übersicht der neuen Ordnerstruktur**
+
+Die neue Ordnerstruktur zielt darauf ab, eine moderne Basis für REDAXO-Projekte zu schaffen, mit einer klaren Trennung von Ressourcen.
+
+```
+.
+├── bin/                   # Binärdateien und Konsolenanwendungen
+│   └── console            # REDAXO Konsole Anwendung
+├── public/                # Öffentliches Verzeichnis (Webroot)
+│   ├── assets/          # Öffentliche Assets
+│   │   ├── addons/      # Öffentliche Addon Assets
+│   │   └── core/       # Öffentliche Core Assets
+│   ├── media/           # Medien Dateien
+│   └── redaxo/          # REDAXO Backend
+│       └── index.php      # Backend Index Datei
+├── src/                   # Quellcode
+│   ├── addons/           # REDAXO Addons
+│   │   └── [addon_name]/  # Hier landen die runtergeladenen Addons
+│   ├── core/            # REDAXO Core Dateien
+│   ├── module/          # REDAXO Module Dateien
+│   └── templates/      # REDAXO Template Dateien
+│   └── AppPathProvider.php # PathProvider Datei
+├── var/                   # Variable Daten
+│   ├── cache/             # Cache Dateien
+│   ├── data/             # Daten Dateien
+│   └── log/              # Log Dateien
+├── .env                   # Umgebungsvariablen
+├── .gitignore             # Git Ignorier Datei
+├── deploy.php           # Deploy Datei
+├── LICENSE                # Lizenzdatei
+├── package.json           # Node.js Package Datei
+├── postcss.config.js   # PostCSS Konfigurationsdatei
+├── README.md              # Readme Datei
+├── webpack.config.js      # Webpack Konfigurationsdatei
+└── addons.txt             # Liste der Addon URLs
+```
+
+**Erläuterung der Verzeichnisse und Dateien**
+
+*   **`bin/`**:
+    *   Enthält ausführbare Dateien und Konsolenanwendungen.
+    *   **`console`**: Die REDAXO-Console-Anwendung, die Befehle ausführen kann.
+*   **`public/`**:
+    *   Das öffentliche Verzeichnis, das als Webroot dient und direkt vom Webserver zugänglich ist.
+        *   **`assets/`**: Hier liegen die statischen Assets, die direkt über die Webseite ausgeliefert werden.
+            *   **`addons/`**: Hier liegen die Assets der installierten Addons.
+             *   **`core/`**: Hier liegen die Assets des REDAXO Cores.
+        *   **`media/`**: Hier werden die hochgeladenen Medien-Dateien gespeichert.
+        *    **`redaxo/`**: Das REDAXO Backend.
+           *  **`index.php`**: Die Einstiegsdatei für das Backend.
+*  **`src/`**:
+    *  Das Verzeichnis für den Quellcode der Anwendung.
+       *   **`addons/`**: Enthält die installierten REDAXO-Addons.
+           *   **`[addon_name]/`**: Hier landen die heruntergeladenen Addons. Die Ordner haben den gleichen Namen wie das Addon selbst.
+       *    **`core/`**: Enthält den Quellcode des REDAXO-Core.
+       *    **`module/`**: Enthält die Dateien der REDAXO Module.
+      *    **`templates/`**: Enthält die Dateien der REDAXO Templates.
+        *    **`AppPathProvider.php`**: Der Path Provider, der zur Auflösung von Pfaden innerhalb der Anwendung genutzt wird.
+*   **`var/`**:
+    *   Enthält variable Daten, die während der Laufzeit der Anwendung benötigt werden.
+    *   **`cache/`**: Enthält Cache-Dateien.
+    *   **`data/`**: Enthält Daten-Dateien.
+    *   **`log/`**: Enthält Log-Dateien.
+*   **`.env`**:
+    *   Enthält Umgebungsvariablen, die in der Anwendung verwendet werden.
+*   **`.gitignore`**:
+    *  Definiert Dateien und Ordner, die von Git ignoriert werden sollen.
+*   **`deploy.php`**:
+    *   Eine Datei für die Bereitstellung der Anwendung.
+*   **`LICENSE`**:
+    *   Die Lizenzdatei des Projekts.
+*   **`package.json`**:
+    *   Eine Datei, die Informationen über die Node.js-Pakete enthält, die in deinem Projekt verwendet werden.
+*   **`postcss.config.js`**:
+    *   Eine Konfigurationsdatei für PostCSS.
+*   **`README.md`**:
+    *   Die Readme-Datei des Projekts.
+*   **`webpack.config.js`**:
+    *   Eine Konfigurationsdatei für Webpack.
+*   **`addons.txt`**:
+    *   Eine Textdatei, die eine Liste von Addon-URLs enthält. Jede URL steht in einer neuen Zeile.
+
+
+
+
+
 ## Beiträge
 
 Beiträge und Verbesserungsvorschläge sind herzlich willkommen!

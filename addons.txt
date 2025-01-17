@@ -5,7 +5,7 @@ https://api.github.com/repos/FriendsOfREDAXO/focuspoint
 https://api.github.com/repos/FriendsOfREDAXO/mform
 https://api.github.com/repos/FriendsOfREDAXO/quick_navigation
 https://api.github.com/repos/FriendsOfREDAXO/yrewrite_scheme
-https://api.github.com/repos/ndiLeni/media_negotiator
+https://api.github.com/repos/AndiLeni/media_negotiator
 https://api.github.com/repos/tbaddade/redaxo_sprog
 https://api.github.com/repos/tbaddade/redaxo_url
 https://api.github.com/repos/tbaddade/redaxo_watson

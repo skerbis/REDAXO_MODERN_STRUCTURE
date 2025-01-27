@@ -32,23 +32,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y yarn
 
-      # 5. Setup Dateien herunterladen
-      - name: Download setup files from yakamara/yak
-        run: |
-          SETUP_URL="https://raw.githubusercontent.com/yakamara/yak/main/setup"
-          mkdir -p setup
-          curl -Ls "$SETUP_URL/setup.ini" -o setup/setup.ini
-          curl -Ls "$SETUP_URL/addon.project.boot.php" -o setup/addon.project.boot.php
-          curl -Ls "$SETUP_URL/console" -o setup/console
-          curl -Ls "$SETUP_URL/index.backend.php" -o setup/index.backend.php
-          curl -Ls "$SETUP_URL/index.frontend.php" -o setup/index.frontend.php
-          curl -Ls "$SETUP_URL/AppPathProvider.php" -o setup/AppPathProvider.php
-
-      # 6. ini Modul für Node.js installieren
-      - name: Install ini module for Node.js
-        run: npm install ini
-
-      # 7. Neuste REDAXO Version ermitteln
+      # 5. Neuste REDAXO Version ermitteln
       - name: Get latest REDAXO release
         id: get_redaxo_release
         run: |
@@ -57,25 +41,12 @@ jobs:
           SHA=$(curl -Ls "https://github.com/redaxo/redaxo/releases/download/$RELEASE_URL/redaxo_$RELEASE_URL.zip" | shasum -a 1 | awk '{print $1}')
           echo "::set-output name=redaxo_sha::$SHA"
 
-      # 8. Konfiguration einlesen
-      - name: Read and prepare Configuration from setup.ini
-        id: config
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const ini = require('ini');
-            const configString = fs.readFileSync('./setup/setup.ini', 'utf-8');
-            const config = ini.parse(configString);
-            core.setOutput('redaxo_version', "${{ steps.get_redaxo_release.outputs.redaxo_version }}");
-            core.setOutput('redaxo_sha', "${{ steps.get_redaxo_release.outputs.redaxo_sha }}");
-
-      # 9. Temporäre Verzeichnisse erstellen
+      # 6. Temporäre Verzeichnisse erstellen
       - name: Create temporary directories
         run: |
           mkdir -p tmp/redaxo
 
-      # 10. REDAXO herunterladen
+      # 7. REDAXO herunterladen
       - name: Download REDAXO
         run: |
           VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
@@ -88,14 +59,14 @@ jobs:
             exit 1
           fi
 
-      # 11. REDAXO entpacken
+      # 8. REDAXO entpacken
       - name: Unzip REDAXO
         run: |
           VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
           FILE="tmp/redaxo/redaxo_${VERSION}.zip"
           unzip "${FILE}" -d public
 
-      # 12. Yakamara Ordnerstruktur erstellen
+      # 9. Yakamara Ordnerstruktur erstellen
       - name: Create Yakamara file structure
         run: |
           mkdir -p var
@@ -109,16 +80,16 @@ jobs:
           rm public/README.md
           rm public/README.de.md
 
-      # 13. Setup Dateien kopieren
+      # 10. Setup Dateien kopieren
       - name: Copy setup files
         run: |
-          cp setup/addon.project.boot.php src/addons/project/boot.php
-          cp setup/console bin/console
-          cp setup/index.backend.php public/redaxo/index.php
-          cp setup/index.frontend.php public/index.php
-          cp setup/AppPathProvider.php src/AppPathProvider.php
+          cp .github/files/addon.project.boot.php src/addons/project/boot.php
+          cp .github/files/console bin/console
+          cp .github/files/index.backend.php public/redaxo/index.php
+          cp .github/files/index.frontend.php public/index.php
+          cp .github/files/AppPathProvider.php src/AppPathProvider.php
 
-      # 14. Addons herunterladen und installieren
+      # 11. Addons herunterladen und installieren
       - name: Download and Install Addons
         run: |
           while IFS= read -r addon_url; do
@@ -147,14 +118,13 @@ jobs:
           done < addons.txt
         shell: bash
 
-      # 15. Temporäre Verzeichnisse entfernen
+      # 12. Temporäre Verzeichnisse entfernen
       - name: Remove temporary directories
         run: |
           rm -rf tmp/redaxo
-          rm -rf setup
           find tmp -maxdepth 1 -type d -exec rm -rf {} +
 
-      # 16. Pull Request erstellen
+      # 13. Pull Request erstellen
       - name: Create Pull Request
         id: create_pr
         uses: peter-evans/create-pull-request@v5

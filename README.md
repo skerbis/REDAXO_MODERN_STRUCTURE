@@ -55,29 +55,24 @@ https://api.github.com/repos/yakamara/redaxo_yrewrite
 
 ## Verwendung
 
-1.  **Erstelle einen Personal Access Token (PAT):**
+1. Forken 
+2. addons.txt anpassen
+
+2.  **Erstelle einen Personal Access Token (PAT):**
     *   Gehe zu deinen GitHub-Einstellungen -> Entwicklereinstellungen -> Personal access tokens.
     *   Erstelle einen neuen Token mit dem `repo` Scope.
     *   Kopiere den Token.
-2.  **Füge den PAT als Secret hinzu:**
+3.  **Füge den PAT als Secret hinzu:**
     *   Navigiere zu deinem Repository -> Einstellungen -> Secrets -> Actions
     *   Erstelle ein neues Secret mit dem Namen `PAT_TOKEN` und füge den kopierten Token als Wert ein.
-3.  **Kopiere die benötigten Setup-Dateien:**
-    * Erstelle das Verzeichnis `.github/files` in deinem Repository
-    * Kopiere die folgenden Dateien in dieses Verzeichnis:
-      * `addon.project.boot.php`
-      * `console`
-      * `index.backend.php`
-      * `index.frontend.php`
-      * `AppPathProvider.php`
-4.  **Erstelle die `addons.txt` Datei im Root des Repository**.
-5.  **Führe die Action manuell aus:**
+
+4.  **Führe die Action manuell aus:**
     *   Gehe in deinem Repository zu "Actions".
     *   Wähle den Workflow "Setup REDAXO" aus und klicke auf "Run workflow".
-6.  **Überprüfe den Pull Request:**
+5.  **Überprüfe den Pull Request:**
     *   Nach erfolgreicher Ausführung der Action solltest du einen neuen Pull Request in deinem Repository sehen.
     *   Überprüfe die Änderungen, um sicherzustellen, dass alles korrekt ist.
-7.  **Merge den Pull Request:**
+6.  **Merge den Pull Request:**
     *   Wenn du mit den Änderungen zufrieden bist, merge den Pull Request in deinen Hauptbranch.
 
 ## Das Ergebnis 

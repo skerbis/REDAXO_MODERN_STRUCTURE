@@ -80,6 +80,9 @@ jobs:
       # 11. Addons herunterladen und installieren
       - name: Download and Install Addons
         run: |
+          # Stelle sicher, dass tmp existiert
+          mkdir -p tmp
+          
           while IFS= read -r line; do
             # Überspringe leere Zeilen und Kommentare
             if [[ -z "$line" || "$line" =~ ^# ]]; then
@@ -124,9 +127,28 @@ jobs:
               continue
             fi
             
+            # Stelle sicher dass tmp existiert
+            mkdir -p tmp
+            
+            echo "Downloading to tmp/$ADDON_REPO_NAME.zip"
             curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REPO_NAME.zip"
+            
+            # Überprüfe, ob die ZIP-Datei erfolgreich heruntergeladen wurde
+            if [ ! -f "tmp/$ADDON_REPO_NAME.zip" ]; then
+              echo "ERROR: Failed to download zip file for $ADDON_REPO_NAME"
+              continue
+            fi
+            
+            echo "Unzipping tmp/$ADDON_REPO_NAME.zip"
             unzip -q "tmp/$ADDON_REPO_NAME.zip" -d tmp
-            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REPO_NAME}-*" -o -name "${REPO_NAME}-*")
+            
+            # Suche nach dem extrahierten Verzeichnis
+            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*${REPO_NAME}*" | grep -v "^tmp$" | head -1)
+            
+            if [ -z "$ADDON_DIR" ]; then
+              echo "No matching directory found after unzip. Looking for any directories in tmp..."
+              ADDON_DIR=$(find tmp -maxdepth 1 -type d | grep -v "^tmp$" | head -1)
+            fi
             
             if [[ -n "$ADDON_DIR" ]]; then
                 echo "Found addon dir: $ADDON_DIR"
@@ -169,8 +191,14 @@ jobs:
       # 12. Temporäre Verzeichnisse entfernen
       - name: Remove temporary directories
         run: |
-          rm -rf tmp/redaxo
-          find tmp -maxdepth 1 -type d -exec rm -rf {} \;
+          if [ -d "tmp/redaxo" ]; then
+            rm -rf tmp/redaxo
+          fi
+          
+          if [ -d "tmp" ]; then
+            find tmp -maxdepth 1 -type d -name "*" -not -path "tmp" -exec rm -rf {} \;
+            rm -rf tmp
+          fi
       # 13. Pull Request erstellen
       - name: Create Pull Request
         id: create_pr

@@ -6,9 +6,9 @@ https://api.github.com/repos/FriendsOfREDAXO/mform
 https://api.github.com/repos/FriendsOfREDAXO/quick_navigation
 https://api.github.com/repos/FriendsOfREDAXO/yrewrite_scheme
 https://api.github.com/repos/AndiLeni/media_negotiator
-https://api.github.com/repos/tbaddade/redaxo_sprog
-https://api.github.com/repos/tbaddade/redaxo_url
-https://api.github.com/repos/tbaddade/redaxo_watson
+https://api.github.com/repos/tbaddade/redaxo_sprog sprog
+https://api.github.com/repos/tbaddade/redaxo_url url
+https://api.github.com/repos/tbaddade/redaxo_watson watson
 https://api.github.com/repos/yakamara/yform
-https://api.github.com/repos/yakamara/redaxo_yrewrite
+https://api.github.com/repos/yakamara/yrewrite
 https://api.github.com/repos/klxm/filepond_uploader

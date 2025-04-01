@@ -80,15 +80,24 @@ jobs:
       # 11. Addons herunterladen und installieren
       - name: Download and Install Addons
         run: |
-          while IFS= read -r addon_url; do
-            echo "Installing addon: $addon_url"
-             
-            ADDON_REPO_NAME=$(echo "$addon_url" | sed -E 's/.*\///g')
-            REPO_OWNER=$(echo "$addon_url" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f1)
-            REPO_NAME=$(echo "$addon_url" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f2)
+          while IFS= read -r line; do
+            # Überspringe leere Zeilen und Kommentare
+            if [[ -z "$line" || "$line" =~ ^# ]]; then
+              continue
+            fi
+            
+            # Extrahiere Addon-URL und gewünschten Ordnernamen (falls angegeben)
+            ADDON_URL=$(echo "$line" | awk '{print $1}')
+            TARGET_DIR=$(echo "$line" | awk '{print $2}')
+            
+            echo "Installing addon: $ADDON_URL"
+            
+            ADDON_REPO_NAME=$(echo "$ADDON_URL" | sed -E 's/.*\///g')
+            REPO_OWNER=$(echo "$ADDON_URL" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f1)
+            REPO_NAME=$(echo "$ADDON_URL" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f2)
             
             # Versuche zunächst, das neueste Release zu bekommen
-            RELEASE_URL="$addon_url/releases/latest"
+            RELEASE_URL="$ADDON_URL/releases/latest"
             echo "RELEASE_URL: $RELEASE_URL"
             
             RELEASE_DATA=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL")
@@ -122,21 +131,29 @@ jobs:
             if [[ -n "$ADDON_DIR" ]]; then
                 echo "Found addon dir: $ADDON_DIR"
                 
-                # Auslesen des tatsächlichen Addon-Namens aus der package.yml
-                if [[ -f "$ADDON_DIR/package.yml" ]]; then
+                # Verwende zuerst den angegebenen Zielordnernamen, falls vorhanden
+                if [[ -n "$TARGET_DIR" ]]; then
+                    ADDON_NAME="$TARGET_DIR"
+                    echo "Using specified target directory: $ADDON_NAME"
+                # Andernfalls auslesen des tatsächlichen Addon-Namens aus der package.yml
+                elif [[ -f "$ADDON_DIR/package.yml" ]]; then
                     ADDON_NAME=$(grep -m 1 "^package:" "$ADDON_DIR/package.yml" | sed -E 's/package:\s*//g')
                     if [[ -z "$ADDON_NAME" ]]; then
                         # Fallback: Versuche es mit dem Namen anstelle von package
                         ADDON_NAME=$(grep -m 1 "^name:" "$ADDON_DIR/package.yml" | sed -E 's/name:\s*//g')
                     fi
-                fi
-                
-                # Wenn der Name immer noch nicht gefunden wurde, verwende den Repository-Namen
-                if [[ -z "$ADDON_NAME" ]]; then
-                    ADDON_NAME="$ADDON_REPO_NAME"
-                    echo "Could not determine addon name from package.yml, using repository name: $ADDON_NAME"
+                    
+                    # Wenn der Name immer noch nicht gefunden wurde, verwende den Repository-Namen
+                    if [[ -z "$ADDON_NAME" ]]; then
+                        ADDON_NAME="$ADDON_REPO_NAME"
+                        echo "Could not determine addon name from package.yml, using repository name: $ADDON_NAME"
+                    else
+                        echo "Found addon name in package.yml: $ADDON_NAME"
+                    fi
                 else
-                    echo "Found addon name in package.yml: $ADDON_NAME"
+                    # Wenn keine package.yml existiert, verwende den Repository-Namen
+                    ADDON_NAME="$ADDON_REPO_NAME"
+                    echo "No package.yml found, using repository name: $ADDON_NAME"
                 fi
                 
                 # Zielverzeichnis erstellen und Addon verschieben

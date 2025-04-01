@@ -84,14 +84,40 @@ jobs:
             echo "Installing addon: $addon_url"
              
             ADDON_REPO_NAME=$(echo "$addon_url" | sed -E 's/.*\///g')
+            REPO_OWNER=$(echo "$addon_url" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f1)
+            REPO_NAME=$(echo "$addon_url" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f2)
+            
+            # Versuche zunächst, das neueste Release zu bekommen
             RELEASE_URL="$addon_url/releases/latest"
             echo "RELEASE_URL: $RELEASE_URL"
-            ZIP_URL=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL" | jq -r '.zipball_url')
+            
+            RELEASE_DATA=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL")
+            ZIP_URL=$(echo "$RELEASE_DATA" | jq -r '.zipball_url')
+            
+            # Wenn kein Release gefunden wurde oder zipball_url null ist, verwende stattdessen den master/main Branch
+            if [[ "$ZIP_URL" == "null" || -z "$ZIP_URL" ]]; then
+              echo "No release found, trying master branch..."
+              ZIP_URL="https://github.com/$REPO_OWNER/$REPO_NAME/archive/refs/heads/master.zip"
+              
+              # Prüfe, ob die master.zip Datei existiert
+              HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$ZIP_URL")
+              
+              if [[ "$HTTP_STATUS" != "200" ]]; then
+                echo "master branch not found, trying main branch..."
+                ZIP_URL="https://github.com/$REPO_OWNER/$REPO_NAME/archive/refs/heads/main.zip"
+              fi
+            fi
+            
             echo "ZIP_URL: $ZIP_URL"
-             
+            
+            if [[ -z "$ZIP_URL" || "$ZIP_URL" == "null" ]]; then
+              echo "ERROR: Could not determine download URL for $ADDON_REPO_NAME"
+              continue
+            fi
+            
             curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REPO_NAME.zip"
-            unzip "tmp/$ADDON_REPO_NAME.zip" -d tmp
-            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REPO_NAME}-*")
+            unzip -q "tmp/$ADDON_REPO_NAME.zip" -d tmp
+            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*-${ADDON_REPO_NAME}-*" -o -name "${REPO_NAME}-*")
             
             if [[ -n "$ADDON_DIR" ]]; then
                 echo "Found addon dir: $ADDON_DIR"

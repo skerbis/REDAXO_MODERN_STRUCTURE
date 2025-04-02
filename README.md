@@ -35,7 +35,7 @@ Diese Action hat keine Eingabeparameter. Die Konfiguration wird über Dateien im
     * `index.backend.php`
     * `index.frontend.php`
     * `AppPathProvider.php`
-*   **`addons.txt`**: Eine Textdatei, die die URLs der Addon Repositories enthält. Jede URL steht in einer neuen Zeile. Diese muss im Root des Repository angelegt werden.
+    * **`addons.txt`**: Eine Textdatei, die die URLs der Addon Repositories enthält. Jede URL steht in einer neuen Zeile. Diese muss im Root des Repository angelegt werden.
 
 #### Beispiel für `addons.txt`
 
@@ -45,13 +45,14 @@ https://api.github.com/repos/FriendsOfREDAXO/developer
 https://api.github.com/repos/FriendsOfREDAXO/focuspoint
 https://api.github.com/repos/FriendsOfREDAXO/mblock
 https://api.github.com/repos/FriendsOfREDAXO/quick_navigation
-https://api.github.com/repos/tbaddade/redaxo_sprog
+https://api.github.com/repos/tbaddade/redaxo_sprog sprog
 https://api.github.com/repos/tbaddade/redaxo_url
-https://api.github.com/repos/tbaddade/redaxo_watson
+https://api.github.com/repos/tbaddade/redaxo_watson watson
 https://api.github.com/repos/yakamara/ydeploy
 https://api.github.com/repos/yakamara/yform
-https://api.github.com/repos/yakamara/redaxo_yrewrite
+https://api.github.com/repos/yakamara/redaxo_yrewrite yrewrite
 ```
+Die Ordner können umbenannt werden, wenn das original dem key nicht entspricht. Hierzu nach der URL ein Leerzeichen gefolgt vom gewünschten Ordnernamen angeben. 
 
 ## Verwendung
 

@@ -186,7 +186,7 @@ jobs:
             fi
             
             rm "tmp/$ADDON_REPO_NAME.zip"
-          done < addons.txt
+          done < .github/files/addons.txt
         shell: bash
       # 12. Temporäre Verzeichnisse entfernen
       - name: Remove temporary directories

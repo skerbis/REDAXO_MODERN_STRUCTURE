@@ -97,13 +97,11 @@ Die neue Ordnerstruktur zielt darauf ab, eine moderne Basis für REDAXO-Projekte
 │   ├── addons/           # REDAXO Addons
 │   │   └── [addon_name]/  # Hier landen die runtergeladenen Addons
 │   ├── core/            # REDAXO Core Dateien
-│   ├── module/          # REDAXO Module Dateien
-│   └── templates/      # REDAXO Template Dateien
 │   └── AppPathProvider.php # PathProvider Datei
 ├── var/                   # Variable Daten
 │   ├── cache/             # Cache Dateien
-│   ├── data/             # Daten Dateien
-│   └── log/              # Log Dateien
+│   ├── data/              # Daten Dateien
+│   └── log/               # Log Dateien
 ├── .gitignore             # Git Ignorier Datei
 ├── LICENSE                # Lizenzdatei
 ├── package.json           # Node.js Package Datei

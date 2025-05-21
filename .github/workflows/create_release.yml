@@ -1,0 +1,229 @@
+name: Setup REDAXO
+on:
+  workflow_dispatch:
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout des Repository
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+      # 2. PHP Umgebung einrichten
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          extensions: zip, curl, gd
+      # 3. Node.js installieren
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # 4. Yarn installieren
+      - name: Install Yarn
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yarn
+      # 5. Neuste REDAXO Version ermitteln
+      - name: Get latest REDAXO release
+        id: get_redaxo_release
+        run: |
+          RELEASE_URL=$(curl -s "https://api.github.com/repos/redaxo/redaxo/releases/latest" | jq -r ".tag_name")
+          echo "redaxo_version=$RELEASE_URL" >> $GITHUB_OUTPUT
+          SHA=$(curl -Ls "https://github.com/redaxo/redaxo/releases/download/$RELEASE_URL/redaxo_$RELEASE_URL.zip" | shasum -a 1 | awk '{print $1}')
+          echo "redaxo_sha=$SHA" >> $GITHUB_OUTPUT
+      # 6. Temporäre Verzeichnisse erstellen
+      - name: Create temporary directories
+        run: |
+          mkdir -p tmp/redaxo
+      # 7. REDAXO herunterladen
+      - name: Download REDAXO
+        run: |
+          VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
+          SHA="${{ steps.get_redaxo_release.outputs.redaxo_sha }}"
+          FILE="tmp/redaxo/redaxo_${VERSION}.zip"
+          curl -Ls "https://github.com/redaxo/redaxo/releases/download/${VERSION}/redaxo_${VERSION}.zip" -o "${FILE}"
+          echo "File SHA: $(sha1sum ${FILE})"
+          if [[ "$(sha1sum ${FILE} | awk '{print $1}')" != "${SHA}" ]]; then
+            echo "ERROR: SHA-Hash is incorrect."
+            exit 1
+          fi
+      # 8. REDAXO entpacken
+      - name: Unzip REDAXO
+        run: |
+          VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
+          FILE="tmp/redaxo/redaxo_${VERSION}.zip"
+          unzip "${FILE}" -d public
+      # 9. Yakamara Ordnerstruktur erstellen
+      - name: Create Yakamara file structure
+        run: |
+          mkdir -p var
+          mkdir -p src
+          mv public/redaxo/bin/ bin
+          mv public/redaxo/cache var/cache
+          mv public/redaxo/data var/data
+          mv public/redaxo/src/addons src/addons
+          mv public/redaxo/src/core src/core
+          mv public/LICENSE.md LICENSE.md
+          rm public/README.md
+          rm public/README.de.md
+      # 10. Setup Dateien kopieren
+      - name: Copy setup files
+        run: |
+          cp .github/files/addon.project.boot.php src/addons/project/boot.php
+          cp .github/files/console bin/console
+          cp .github/files/index.backend.php public/redaxo/index.php
+          cp .github/files/index.frontend.php public/index.php
+          cp .github/files/AppPathProvider.php src/AppPathProvider.php
+      # 11. Addons herunterladen und installieren
+      - name: Download and Install Addons
+        run: |
+          # Stelle sicher, dass tmp existiert
+          mkdir -p tmp
+          
+          while IFS= read -r line; do
+            # Überspringe leere Zeilen und Kommentare
+            if [[ -z "$line" || "$line" =~ ^# ]]; then
+              continue
+            fi
+            
+            # Extrahiere Addon-URL und gewünschten Ordnernamen (falls angegeben)
+            ADDON_URL=$(echo "$line" | awk '{print $1}')
+            TARGET_DIR=$(echo "$line" | awk '{print $2}')
+            
+            echo "Installing addon: $ADDON_URL"
+            
+            ADDON_REPO_NAME=$(echo "$ADDON_URL" | sed -E 's/.*\///g')
+            REPO_OWNER=$(echo "$ADDON_URL" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f1)
+            REPO_NAME=$(echo "$ADDON_URL" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f2)
+            
+            # Versuche zunächst, das neueste Release zu bekommen
+            RELEASE_URL="$ADDON_URL/releases/latest"
+            echo "RELEASE_URL: $RELEASE_URL"
+            
+            RELEASE_DATA=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL")
+            ZIP_URL=$(echo "$RELEASE_DATA" | jq -r '.zipball_url')
+            
+            # Wenn kein Release gefunden wurde oder zipball_url null ist, verwende stattdessen den master/main Branch
+            if [[ "$ZIP_URL" == "null" || -z "$ZIP_URL" ]]; then
+              echo "No release found, trying master branch..."
+              ZIP_URL="https://github.com/$REPO_OWNER/$REPO_NAME/archive/refs/heads/master.zip"
+              
+              # Prüfe, ob die master.zip Datei existiert
+              HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$ZIP_URL")
+              
+              if [[ "$HTTP_STATUS" != "200" ]]; then
+                echo "master branch not found, trying main branch..."
+                ZIP_URL="https://github.com/$REPO_OWNER/$REPO_NAME/archive/refs/heads/main.zip"
+              fi
+            fi
+            
+            echo "ZIP_URL: $ZIP_URL"
+            
+            if [[ -z "$ZIP_URL" || "$ZIP_URL" == "null" ]]; then
+              echo "ERROR: Could not determine download URL for $ADDON_REPO_NAME"
+              continue
+            fi
+            
+            # Stelle sicher dass tmp existiert
+            mkdir -p tmp
+            
+            echo "Downloading to tmp/$ADDON_REPO_NAME.zip"
+            curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REPO_NAME.zip"
+            
+            # Überprüfe, ob die ZIP-Datei erfolgreich heruntergeladen wurde
+            if [ ! -f "tmp/$ADDON_REPO_NAME.zip" ]; then
+              echo "ERROR: Failed to download zip file for $ADDON_REPO_NAME"
+              continue
+            fi
+            
+            echo "Unzipping tmp/$ADDON_REPO_NAME.zip"
+            unzip -q "tmp/$ADDON_REPO_NAME.zip" -d tmp
+            
+            # Suche nach dem extrahierten Verzeichnis
+            ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*${REPO_NAME}*" | grep -v "^tmp$" | head -1)
+            
+            if [ -z "$ADDON_DIR" ]; then
+              echo "No matching directory found after unzip. Looking for any directories in tmp..."
+              ADDON_DIR=$(find tmp -maxdepth 1 -type d | grep -v "^tmp$" | head -1)
+            fi
+            
+            if [[ -n "$ADDON_DIR" ]]; then
+                echo "Found addon dir: $ADDON_DIR"
+                
+                # Verwende zuerst den angegebenen Zielordnernamen, falls vorhanden
+                if [[ -n "$TARGET_DIR" ]]; then
+                    ADDON_NAME="$TARGET_DIR"
+                    echo "Using specified target directory: $ADDON_NAME"
+                # Andernfalls auslesen des tatsächlichen Addon-Namens aus der package.yml
+                elif [[ -f "$ADDON_DIR/package.yml" ]]; then
+                    ADDON_NAME=$(grep -m 1 "^package:" "$ADDON_DIR/package.yml" | sed -E 's/package:\s*//g')
+                    if [[ -z "$ADDON_NAME" ]]; then
+                        # Fallback: Versuche es mit dem Namen anstelle von package
+                        ADDON_NAME=$(grep -m 1 "^name:" "$ADDON_DIR/package.yml" | sed -E 's/name:\s*//g')
+                    fi
+                    
+                    # Wenn der Name immer noch nicht gefunden wurde, verwende den Repository-Namen
+                    if [[ -z "$ADDON_NAME" ]]; then
+                        ADDON_NAME="$ADDON_REPO_NAME"
+                        echo "Could not determine addon name from package.yml, using repository name: $ADDON_NAME"
+                    else
+                        echo "Found addon name in package.yml: $ADDON_NAME"
+                    fi
+                else
+                    # Wenn keine package.yml existiert, verwende den Repository-Namen
+                    ADDON_NAME="$ADDON_REPO_NAME"
+                    echo "No package.yml found, using repository name: $ADDON_NAME"
+                fi
+                
+                # Zielverzeichnis erstellen und Addon verschieben
+                mkdir -p "src/addons/$ADDON_NAME"
+                cp -r "$ADDON_DIR"/* "src/addons/$ADDON_NAME"/
+            else
+                echo "Addon directory not found for $ADDON_REPO_NAME"
+            fi
+            
+            rm "tmp/$ADDON_REPO_NAME.zip"
+          done < .github/files/addons.txt
+        shell: bash
+      # 12. Temporäre Verzeichnisse entfernen
+      - name: Remove temporary directories
+        run: |
+          if [ -d "tmp/redaxo" ]; then
+            rm -rf tmp/redaxo
+          fi
+          
+          if [ -d "tmp" ]; then
+            find tmp -maxdepth 1 -type d -name "*" -not -path "tmp" -exec rm -rf {} \;
+            rm -rf tmp
+          fi
+      # 13. Release erstellen anstatt Pull Request
+      - name: Create release from generated files
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          # Hole die aktuelle REDAXO Version für das Release Tag
+          REDAXO_VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
+          # Erstelle einen Timestamp für das Release
+          TIMESTAMP=$(date +"%Y%m%d%H%M")
+          # Erstelle einen Release Tag
+          RELEASE_TAG="redaxo-setup-${REDAXO_VERSION}-${TIMESTAMP}"
+          
+          # Erstelle einen Zip-Archiv mit allen generierten Dateien
+          zip -r redaxo-setup.zip public/ src/ var/ bin/ LICENSE.md
+          
+          # Commit die Änderungen auf einen temporären Branch
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git checkout -b temp-release-branch
+          git add public/ src/ var/ bin/ LICENSE.md
+          git commit -m "REDAXO Setup für Version ${REDAXO_VERSION}"
+          
+          # Erstelle das Release mit GitHub CLI
+          gh release create "$RELEASE_TAG" \
+            --title "REDAXO Setup ${REDAXO_VERSION}" \
+            --notes "Automatisch generiertes REDAXO Setup mit Version ${REDAXO_VERSION}" \
+            redaxo-setup.zip

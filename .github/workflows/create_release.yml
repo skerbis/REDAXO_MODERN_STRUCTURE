@@ -1,4 +1,4 @@
-name: Setup REDAXO
+name: Crate REDAXO Release
 on:
   workflow_dispatch:
 jobs:

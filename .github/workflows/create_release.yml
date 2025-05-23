@@ -212,8 +212,12 @@ jobs:
           # Erstelle einen Release Tag
           RELEASE_TAG="redaxo-setup-${REDAXO_VERSION}-${TIMESTAMP}"
           
-          # Erstelle einen Zip-Archiv mit allen generierten Dateien
-          zip -r redaxo-setup.zip public/ src/ var/ bin/ LICENSE.md
+          # Erstelle einen temporären Ordner für den Export
+          mkdir -p export-temp
+          cp -r public/ src/ var/ bin/ LICENSE.md export-temp/
+          
+          # Erstelle ein Zip-Archiv direkt aus dem Inhalt des temporären Ordners
+          cd export-temp && zip -r ../redaxo-setup.zip * && cd ..
           
           # Commit die Änderungen auf einen temporären Branch
           git config --global user.name "GitHub Action"
@@ -227,3 +231,6 @@ jobs:
             --title "REDAXO Setup ${REDAXO_VERSION}" \
             --notes "Automatisch generiertes REDAXO Setup mit Version ${REDAXO_VERSION}" \
             redaxo-setup.zip
+          
+          # Entferne den temporären Export-Ordner
+          rm -rf export-temp

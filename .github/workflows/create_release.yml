@@ -212,15 +212,9 @@ jobs:
           # Erstelle einen Release Tag
           RELEASE_TAG="redaxo-setup-${REDAXO_VERSION}-${TIMESTAMP}"
           
-          # Erstelle ein temporäres Verzeichnis für das ZIP ohne Unterordner
-          mkdir -p temp_zip
-          cp -r public src var bin LICENSE.md temp_zip/
-          
-          # Wechsle in das temporäre Verzeichnis und erstelle das ZIP
-          cd temp_zip && zip -r ../redaxo-setup.zip * && cd ..
-          
-          # Räume das temporäre Verzeichnis wieder auf
-          rm -rf temp_zip
+          # Erstelle einen Zip-Archiv mit allen generierten Dateien und inkludiere die Version im Namen
+          ZIP_FILENAME="redaxo-setup-${REDAXO_VERSION}.zip"
+          zip -r "$ZIP_FILENAME" public/ src/ var/ bin/ LICENSE.md
           
           # Commit die Änderungen auf einen temporären Branch
           git config --global user.name "GitHub Action"
@@ -233,4 +227,4 @@ jobs:
           gh release create "$RELEASE_TAG" \
             --title "REDAXO Setup ${REDAXO_VERSION}" \
             --notes "Automatisch generiertes REDAXO Setup mit Version ${REDAXO_VERSION}" \
-            redaxo-setup.zip
+            "$ZIP_FILENAME"

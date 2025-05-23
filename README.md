@@ -1,6 +1,6 @@
 # REDAXO Distro-Builder inspired by YAK / REPO Template
 
-Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit einer bestimmten Ordnerstruktur und der Möglichkeit, Addons zu installieren. Die Action ist für die manuelle Ausführung konzipiert.
+Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit einer bestimmten Ordnerstruktur und der Möglichkeit, Addons zu installieren. Die Action ist für die manuelle Ausführung konzipiert und erstellt entweder ein Release mit einer ZIP-Datei (primärer Workflow) oder einen Pull Request (sekundärer Workflow).
 
 ## Funktionsweise
 
@@ -18,7 +18,9 @@ Die Action führt folgende Schritte aus:
 10. **Setup Dateien kopieren:** Kopiert die notwendigen Setup Dateien aus `.github/files` an die richtige Position.
 11. **Addons herunterladen und installieren:** Lädt die konfigurierten Addons aus der `addons.txt` Datei herunter und installiert sie in das `src/addons` Verzeichnis.
 12. **Temporäre Verzeichnisse entfernen:** Entfernt alle temporären Verzeichnisse.
-13. **Pull Request erstellen:** Erstellt einen Pull Request mit den erstellten Änderungen.
+13. **Release erstellen (primärer Workflow):** Erstellt ein GitHub Release mit einer ZIP-Datei, die die Version im Namen enthält (z.B. `redaxo-setup-5.15.0.zip`).
+   
+    *Alternative:* **Pull Request erstellen (sekundärer Workflow):** Erstellt einen Pull Request mit den erstellten Änderungen.
 
 ## Konfiguration
 
@@ -28,7 +30,8 @@ Diese Action hat keine Eingabeparameter. Die Konfiguration wird über Dateien im
 
 ### Dateien
 
-*   **`.github/workflows/setup-redaxo.yml`**: Die Workflow Datei der Action, die im Root des Projekts erstellt werden muss.
+*   **`.github/workflows/create_release.yml`**: Die primäre Workflow-Datei, die ein Release mit ZIP-Datei erstellt.
+*   **`.github/workflows/setup-redaxo.yml`**: Die sekundäre Workflow-Datei, die einen PR erstellt.
 *   **`.github/files/`**: Verzeichnis mit den benötigten Setup-Dateien:
     * `addon.project.boot.php`
     * `console`
@@ -67,7 +70,16 @@ Die Ordner können umbenannt werden, wenn das original dem key nicht entspricht.
     *   Navigiere zu deinem Repository -> Einstellungen -> Secrets -> Actions
     *   Erstelle ein neues Secret mit dem Namen `PAT_TOKEN` und füge den kopierten Token als Wert ein.
 
-4.  **Führe die Action manuell aus:**
+4.  **Führe den primären Release-Workflow manuell aus:**
+    *   Gehe in deinem Repository zu "Actions".
+    *   Wähle den Workflow "Create REDAXO Release" aus und klicke auf "Run workflow".
+5.  **Lade die Release-ZIP herunter:**
+    *   Nach erfolgreicher Ausführung des Workflows wird ein Release mit einer ZIP-Datei erstellt, die die REDAXO-Version im Namen trägt (z.B. `redaxo-setup-5.15.0.zip`).
+    *   Das Release enthält alle Dateien, die für ein neues REDAXO-Projekt benötigt werden.
+
+**Alternativ (sekundärer Workflow):**
+
+4.  **Führe den PR-Workflow manuell aus:**
     *   Gehe in deinem Repository zu "Actions".
     *   Wähle den Workflow "Setup REDAXO" aus und klicke auf "Run workflow".
 5.  **Überprüfe den Pull Request:**

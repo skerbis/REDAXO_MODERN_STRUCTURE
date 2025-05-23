@@ -212,12 +212,32 @@ jobs:
           # Erstelle einen Release Tag
           RELEASE_TAG="redaxo-setup-${REDAXO_VERSION}-${TIMESTAMP}"
           
-          # Erstelle einen temporären Ordner für den Export
-          mkdir -p export-temp
-          cp -r public/ src/ var/ bin/ LICENSE.md export-temp/
+          # Erstelle eine einfache README-Datei mit Installationshinweisen
+          cat > README_INSTALL.md << EOL
+# REDAXO Setup Version ${REDAXO_VERSION}
+
+## Installation
+Um dieses REDAXO-Setup zu installieren, entpacken Sie den Inhalt des ZIP-Archivs in Ihren Webserver-Ordner.
+
+## Verzeichnisstruktur
+- public/: Der öffentlich zugängliche Webordner
+- src/: Quellcode und Addons
+- var/: Daten- und Cache-Verzeichnisse
+- bin/: Ausführbare Dateien und Skripte
+EOL
+
+          # Erstelle ein temporäres Verzeichnis für das korrekt strukturierte Archiv
+          mkdir -p temp_root_dir
+          cp -r public src var bin LICENSE.md README_INSTALL.md temp_root_dir/
           
-          # Erstelle ein Zip-Archiv direkt aus dem Inhalt des temporären Ordners
-          cd export-temp && zip -r ../redaxo-setup.zip * && cd ..
+          # Wechsle in das temporäre Verzeichnis und erstelle von dort aus das ZIP
+          # So enthält das ZIP nur die Dateien direkt ohne übergeordneten Ordner
+          cd temp_root_dir
+          zip -r ../redaxo-setup.zip .
+          cd ..
+          
+          # Aufräumen
+          rm -rf temp_root_dir
           
           # Commit die Änderungen auf einen temporären Branch
           git config --global user.name "GitHub Action"
@@ -231,6 +251,3 @@ jobs:
             --title "REDAXO Setup ${REDAXO_VERSION}" \
             --notes "Automatisch generiertes REDAXO Setup mit Version ${REDAXO_VERSION}" \
             redaxo-setup.zip
-          
-          # Entferne den temporären Export-Ordner
-          rm -rf export-temp

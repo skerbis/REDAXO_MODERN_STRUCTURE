@@ -215,7 +215,6 @@ jobs:
           # Erstelle einen Zip-Archiv mit allen generierten Dateien
           # Wechsel ins Arbeitsverzeichnis und erstelle das ZIP so, dass die Dateien direkt ohne Unterordner entpackt werden
           cd ${GITHUB_WORKSPACE}
-          # Dateien direkt im Stammverzeichnis des ZIPs speichern (ohne übergeordnete Ordnerstruktur)
           mkdir -p temp_zip
           cp -r public temp_zip/
           cp -r src temp_zip/
@@ -223,7 +222,8 @@ jobs:
           cp -r bin temp_zip/
           cp LICENSE.md temp_zip/
           cd temp_zip
-          zip -r ../redaxo-setup.zip ./*
+          # Wichtig: Mit -j Flag erstellen, um Verzeichnisstruktur zu ignorieren
+          zip -j ../redaxo-setup.zip public/* src/* var/* bin/* LICENSE.md
           cd ..
           rm -rf temp_zip
           

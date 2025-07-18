@@ -1,4 +1,6 @@
 https://api.github.com/repos/FriendsOfREDAXO/adminer
+https://api.github.com/repos/FriendsOfREDAXO/ffmpeg
+https://api.github.com/repos/FriendsOfREDAXO/vidstack
 https://api.github.com/repos/FriendsOfREDAXO/developer
 https://api.github.com/repos/FriendsOfREDAXO/theme
 https://api.github.com/repos/FriendsOfREDAXO/focuspoint

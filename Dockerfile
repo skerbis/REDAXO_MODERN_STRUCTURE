@@ -30,117 +30,21 @@ RUN docker-php-ext-install \
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy configuration files
+# Copy setup scripts and configuration files
+COPY setup-redaxo.sh install-addons.sh ./
 COPY .github/files/ .github/files/
 
-# Build REDAXO structure (replicating the GitHub workflow)
-RUN set -eux; \
-    # Get latest REDAXO release
-    REDAXO_VERSION=$(curl -s "https://api.github.com/repos/redaxo/redaxo/releases/latest" | jq -r ".tag_name"); \
-    echo "Building REDAXO version: $REDAXO_VERSION"; \
-    \
-    # Create temporary directories
-    mkdir -p tmp/redaxo; \
-    \
-    # Download REDAXO
-    curl -Ls "https://github.com/redaxo/redaxo/releases/download/$REDAXO_VERSION/redaxo_$REDAXO_VERSION.zip" -o "tmp/redaxo/redaxo_$REDAXO_VERSION.zip"; \
-    \
-    # Unzip REDAXO
-    unzip "tmp/redaxo/redaxo_$REDAXO_VERSION.zip" -d public; \
-    \
-    # Create Yakamara file structure
-    mkdir -p var src; \
-    mv public/redaxo/bin/ bin/; \
-    mv public/redaxo/cache/ var/cache/; \
-    mv public/redaxo/data/ var/data/; \
-    mv public/redaxo/src/addons/ src/addons/; \
-    mv public/redaxo/src/core/ src/core/; \
-    mv public/LICENSE.md LICENSE.md || true; \
-    rm -f public/README.md public/README.de.md; \
-    \
-    # Copy setup files
-    mkdir -p src/addons/project; \
-    cp .github/files/addon.project.boot.php src/addons/project/boot.php; \
-    cp .github/files/console bin/console; \
-    chmod +x bin/console; \
-    cp .github/files/index.backend.php public/redaxo/index.php; \
-    cp .github/files/index.frontend.php public/index.php; \
-    cp .github/files/AppPathProvider.php src/AppPathProvider.php; \
-    \
-    # Download and Install Addons
-    while IFS= read -r line; do \
-        if [[ -z "$line" || "$line" =~ ^# ]]; then \
-            continue; \
-        fi; \
-        \
-        ADDON_URL=$(echo "$line" | awk '{print $1}'); \
-        TARGET_DIR=$(echo "$line" | awk '{print $2}'); \
-        \
-        echo "Installing addon: $ADDON_URL"; \
-        \
-        ADDON_REPO_NAME=$(echo "$ADDON_URL" | sed -E 's/.*\///g'); \
-        REPO_OWNER=$(echo "$ADDON_URL" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f1); \
-        REPO_NAME=$(echo "$ADDON_URL" | sed -E 's/https:\/\/api.github.com\/repos\///g' | cut -d '/' -f2); \
-        \
-        RELEASE_URL="$ADDON_URL/releases/latest"; \
-        RELEASE_DATA=$(curl -s -H 'User-Agent: PHP' "$RELEASE_URL"); \
-        ZIP_URL=$(echo "$RELEASE_DATA" | jq -r '.zipball_url'); \
-        \
-        if [[ "$ZIP_URL" == "null" || -z "$ZIP_URL" ]]; then \
-            ZIP_URL="https://github.com/$REPO_OWNER/$REPO_NAME/archive/refs/heads/master.zip"; \
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$ZIP_URL"); \
-            if [[ "$HTTP_STATUS" != "200" ]]; then \
-                ZIP_URL="https://github.com/$REPO_OWNER/$REPO_NAME/archive/refs/heads/main.zip"; \
-            fi; \
-        fi; \
-        \
-        if [[ -z "$ZIP_URL" || "$ZIP_URL" == "null" ]]; then \
-            echo "ERROR: Could not determine download URL for $ADDON_REPO_NAME"; \
-            continue; \
-        fi; \
-        \
-        mkdir -p tmp; \
-        curl -Ls "$ZIP_URL" -o "tmp/$ADDON_REPO_NAME.zip"; \
-        \
-        if [ ! -f "tmp/$ADDON_REPO_NAME.zip" ]; then \
-            echo "ERROR: Failed to download zip file for $ADDON_REPO_NAME"; \
-            continue; \
-        fi; \
-        \
-        unzip -q "tmp/$ADDON_REPO_NAME.zip" -d tmp; \
-        \
-        ADDON_DIR=$(find tmp -maxdepth 1 -type d -name "*${REPO_NAME}*" | grep -v "^tmp$" | head -1); \
-        \
-        if [ -z "$ADDON_DIR" ]; then \
-            ADDON_DIR=$(find tmp -maxdepth 1 -type d | grep -v "^tmp$" | head -1); \
-        fi; \
-        \
-        if [[ -n "$ADDON_DIR" ]]; then \
-            if [[ -n "$TARGET_DIR" ]]; then \
-                ADDON_NAME="$TARGET_DIR"; \
-            elif [[ -f "$ADDON_DIR/package.yml" ]]; then \
-                ADDON_NAME=$(grep -m 1 "^package:" "$ADDON_DIR/package.yml" | sed -E 's/package:\s*//g' || true); \
-                if [[ -z "$ADDON_NAME" ]]; then \
-                    ADDON_NAME=$(grep -m 1 "^name:" "$ADDON_DIR/package.yml" | sed -E 's/name:\s*//g' || true); \
-                fi; \
-                if [[ -z "$ADDON_NAME" ]]; then \
-                    ADDON_NAME="$ADDON_REPO_NAME"; \
-                fi; \
-            else \
-                ADDON_NAME="$ADDON_REPO_NAME"; \
-            fi; \
-            \
-            mkdir -p "src/addons/$ADDON_NAME"; \
-            cp -r "$ADDON_DIR"/* "src/addons/$ADDON_NAME"/; \
-        else \
-            echo "Addon directory not found for $ADDON_REPO_NAME"; \
-        fi; \
-        \
-        rm -f "tmp/$ADDON_REPO_NAME.zip"; \
-    done < .github/files/addons.txt; \
-    \
-    # Clean up temporary files
-    rm -rf tmp;
+# Make scripts executable
+RUN chmod +x setup-redaxo.sh install-addons.sh
+
+# Setup REDAXO base system
+RUN ./setup-redaxo.sh
+
+# Install addons (skip for now to test basic setup)
+# RUN ./install-addons.sh
+
+# Clean up scripts
+RUN rm -f setup-redaxo.sh install-addons.sh
 
 # Production stage
 ARG PHP_VERSION=8.1

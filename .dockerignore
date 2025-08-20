@@ -44,3 +44,5 @@ build/
 
 # Keep only essential files for Docker build
 !.github/files/
+!setup-redaxo.sh
+!install-addons.sh

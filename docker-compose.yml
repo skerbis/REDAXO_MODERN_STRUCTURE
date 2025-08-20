@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.1}
     container_name: redaxo-app
     ports:
       - "8080:80"
@@ -20,13 +22,19 @@ services:
     restart: unless-stopped
 
   database:
-    image: mysql:8.0
+    image: ${DB_TYPE:-mysql}:${DB_VERSION:-8.0}
     container_name: redaxo-db
     environment:
-      MYSQL_ROOT_PASSWORD: redaxo
-      MYSQL_DATABASE: redaxo
-      MYSQL_USER: redaxo
-      MYSQL_PASSWORD: redaxo
+      # MySQL environment variables
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-redaxo}
+      MYSQL_DATABASE: ${DB_NAME:-redaxo}
+      MYSQL_USER: ${DB_USER:-redaxo}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-redaxo}
+      # MariaDB environment variables (same as MySQL)
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-redaxo}
+      MARIADB_DATABASE: ${DB_NAME:-redaxo}
+      MARIADB_USER: ${DB_USER:-redaxo}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-redaxo}
     ports:
       - "3306:3306"
     volumes:

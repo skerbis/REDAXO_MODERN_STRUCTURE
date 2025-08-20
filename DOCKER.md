@@ -46,6 +46,59 @@ Nach dem Start der Container ist REDAXO unter folgenden URLs verfügbar:
    - **Benutzer**: `redaxo`
    - **Passwort**: `redaxo`
 
+## Konfiguration
+
+### PHP und Datenbank Versionen konfigurieren
+
+Du kannst verschiedene PHP und Datenbank Versionen verwenden:
+
+1. **Erstelle eine `.env` Datei:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Bearbeite die `.env` Datei:**
+   ```env
+   # PHP Version (8.1, 8.2, 8.3, etc.)
+   PHP_VERSION=8.2
+   
+   # Database Type: mysql oder mariadb
+   DB_TYPE=mariadb
+   
+   # Database Version
+   DB_VERSION=10.11
+   
+   # Database Credentials
+   DB_ROOT_PASSWORD=redaxo
+   DB_NAME=redaxo
+   DB_USER=redaxo
+   DB_PASSWORD=redaxo
+   ```
+
+3. **Container neu bauen:**
+   ```bash
+   docker compose build --no-cache
+   docker compose up -d
+   ```
+
+### Unterstützte Versionen
+
+**PHP Versionen:**
+- 8.1 (Standard)
+- 8.2
+- 8.3
+- 8.4 (falls verfügbar)
+
+**MySQL Versionen:**
+- 5.7
+- 8.0 (Standard)
+- 8.4
+
+**MariaDB Versionen:**
+- 10.6
+- 10.11
+- 11.4
+
 ## Container verwalten
 
 ### Container stoppen

@@ -126,3 +126,72 @@ cd ../projekt2
 # In docker-compose.yml: ports: "8081:80"
 docker compose -p redaxo-projekt2 up -d
 ```
+
+## Beispiel 11: PHP 8.3 mit MariaDB verwenden
+
+```bash
+# .env Datei erstellen
+cat > .env << EOF
+PHP_VERSION=8.3
+DB_TYPE=mariadb
+DB_VERSION=11.4
+DB_ROOT_PASSWORD=redaxo
+DB_NAME=redaxo
+DB_USER=redaxo
+DB_PASSWORD=redaxo
+EOF
+
+# Container bauen und starten
+docker compose build --no-cache
+docker compose up -d
+```
+
+## Beispiel 12: PHP 8.2 mit MySQL 8.4 verwenden
+
+```bash
+# .env Datei erstellen
+cat > .env << EOF
+PHP_VERSION=8.2
+DB_TYPE=mysql
+DB_VERSION=8.4
+EOF
+
+# Container bauen und starten
+docker compose build --no-cache
+docker compose up -d
+```
+
+## Beispiel 13: Entwicklung mit PHP 8.1 und MariaDB
+
+```bash
+# .env Datei für Entwicklung
+cat > .env << EOF
+PHP_VERSION=8.1
+DB_TYPE=mariadb
+DB_VERSION=10.11
+EOF
+
+# Entwicklungsumgebung starten
+docker compose -f docker-compose.dev.yml build --no-cache
+docker compose -f docker-compose.dev.yml up -d
+```
+
+## Beispiel 14: Version-Matrix testen
+
+```bash
+# Test verschiedener PHP/DB Kombinationen
+versions=(
+  "PHP_VERSION=8.1 DB_TYPE=mysql DB_VERSION=8.0"
+  "PHP_VERSION=8.2 DB_TYPE=mariadb DB_VERSION=10.11"
+  "PHP_VERSION=8.3 DB_TYPE=mysql DB_VERSION=8.4"
+)
+
+for version in "${versions[@]}"; do
+  echo "Testing: $version"
+  echo "$version" > .env
+  docker compose build --no-cache
+  docker compose up -d
+  # Test deine Anwendung hier
+  docker compose down
+done
+```

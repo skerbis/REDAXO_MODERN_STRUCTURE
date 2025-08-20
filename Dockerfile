@@ -1,5 +1,6 @@
 # Multi-stage build for REDAXO Modern Structure
-FROM php:8.1-apache as builder
+ARG PHP_VERSION=8.1
+FROM php:${PHP_VERSION}-apache as builder
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -142,7 +143,8 @@ RUN set -eux; \
     rm -rf tmp;
 
 # Production stage
-FROM php:8.1-apache
+ARG PHP_VERSION=8.1
+FROM php:${PHP_VERSION}-apache
 
 # Install system dependencies and PHP extensions
 RUN apt-get update && apt-get install -y \

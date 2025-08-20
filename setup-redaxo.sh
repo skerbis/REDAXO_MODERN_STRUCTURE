@@ -107,38 +107,51 @@ fi
 
 # Unzip REDAXO
 echo "Extracting REDAXO..."
-unzip -q "tmp/redaxo/redaxo_$REDAXO_VERSION.zip" -d tmp/
+unzip -q "tmp/redaxo/redaxo_$REDAXO_VERSION.zip" -d tmp/extracted/
 
-# Find REDAXO directory (could be redaxo/, redaxo-VERSION/, or main)
-REDAXO_DIR=$(find tmp -maxdepth 1 -type d -name "*redaxo*" | head -1)
-if [ -z "$REDAXO_DIR" ]; then
-    echo "ERROR: REDAXO directory not found after extraction"
-    ls -la tmp/
+# Find the extraction root directory
+EXTRACT_ROOT="tmp/extracted"
+if [ ! -d "$EXTRACT_ROOT" ]; then
+    echo "ERROR: Extraction failed"
     exit 1
 fi
 
-echo "Found REDAXO directory: $REDAXO_DIR"
+echo "Checking extracted contents..."
+ls -la "$EXTRACT_ROOT/"
 
 # Move REDAXO contents to public
 mkdir -p public
-if [ -d "$REDAXO_DIR/redaxo" ]; then
-    # Archive format (has redaxo subdirectory)
-    cp -r "$REDAXO_DIR"/* public/
-elif [ -f "$REDAXO_DIR/index.php" ]; then
-    # Release format (direct REDAXO files)
-    cp -r "$REDAXO_DIR"/* public/
-else
-    echo "ERROR: Unexpected REDAXO directory structure"
-    ls -la "$REDAXO_DIR"
-    exit 1
+
+# Copy root level files and directories (index.php, assets, media, redaxo)
+if [ -f "$EXTRACT_ROOT/index.php" ]; then
+    cp "$EXTRACT_ROOT/index.php" public/
+fi
+if [ -d "$EXTRACT_ROOT/assets" ]; then
+    cp -r "$EXTRACT_ROOT/assets" public/
+fi
+if [ -d "$EXTRACT_ROOT/media" ]; then
+    cp -r "$EXTRACT_ROOT/media" public/
+fi
+if [ -d "$EXTRACT_ROOT/redaxo" ]; then
+    cp -r "$EXTRACT_ROOT/redaxo" public/
+fi
+
+# Copy license file
+if [ -f "$EXTRACT_ROOT/LICENSE.md" ]; then
+    cp "$EXTRACT_ROOT/LICENSE.md" LICENSE.md
 fi
 
 # Ensure redaxo directory exists in public
 if [ ! -d "public/redaxo" ]; then
     echo "ERROR: No redaxo directory found in extracted files"
+    echo "Contents of extraction:"
+    ls -la "$EXTRACT_ROOT/"
+    echo "Contents of public:"
     ls -la public/
     exit 1
 fi
+
+echo "REDAXO extracted successfully to public/redaxo"
 
 # Create Yakamara file structure
 echo "Creating modern file structure..."

@@ -1,0 +1,70 @@
+services:
+  redaxo:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.1}
+    container_name: redaxo-dev
+    ports:
+      - "8080:80"
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html/public
+    volumes:
+      # Mount the entire project for development
+      - .:/var/www/html
+      # Override with persistent volumes for data that shouldn't be lost
+      - redaxo_media:/var/www/html/public/media
+      - redaxo_var:/var/www/html/var
+    depends_on:
+      - database
+    networks:
+      - redaxo-network
+    restart: unless-stopped
+
+  database:
+    image: ${DB_TYPE:-mysql}:${DB_VERSION:-8.0}
+    container_name: redaxo-dev-db
+    environment:
+      # MySQL environment variables
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-redaxo}
+      MYSQL_DATABASE: ${DB_NAME:-redaxo}
+      MYSQL_USER: ${DB_USER:-redaxo}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-redaxo}
+      # MariaDB environment variables (same as MySQL)
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-redaxo}
+      MARIADB_DATABASE: ${DB_NAME:-redaxo}
+      MARIADB_USER: ${DB_USER:-redaxo}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-redaxo}
+    ports:
+      - "3306:3306"
+    volumes:
+      - redaxo_db:/var/lib/mysql
+    networks:
+      - redaxo-network
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: redaxo-dev-pma
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: database
+      PMA_USER: redaxo
+      PMA_PASSWORD: redaxo
+    depends_on:
+      - database
+    networks:
+      - redaxo-network
+    restart: unless-stopped
+
+volumes:
+  redaxo_db:
+  redaxo_media:
+  redaxo_var:
+
+networks:
+  redaxo-network:
+    driver: bridge

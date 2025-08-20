@@ -2,6 +2,22 @@
 
 Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit einer bestimmten Ordnerstruktur und der Möglichkeit, Addons zu installieren. Die Action ist für die manuelle Ausführung konzipiert und erstellt entweder ein Release mit einer ZIP-Datei (primärer Workflow) oder einen Pull Request (sekundärer Workflow).
 
+## 🐳 Docker Setup (Empfohlen)
+
+**Schnellster Weg zu REDAXO mit moderner Struktur:**
+
+```bash
+git clone https://github.com/skerbis/REDAXO_MODERN_STRUCTURE.git
+cd REDAXO_MODERN_STRUCTURE
+docker compose up -d
+```
+
+Fertig! REDAXO ist verfügbar unter: http://localhost:8080
+
+📖 **Weitere Informationen:**
+- [Docker Quickstart Guide](DOCKER.md)
+- [Docker Examples](DOCKER-EXAMPLES.md)
+
 ## Funktionsweise
 
 Die Action führt folgende Schritte aus:
@@ -32,6 +48,11 @@ Diese Action hat keine Eingabeparameter. Die Konfiguration wird über Dateien im
 
 *   **`.github/workflows/create_release.yml`**: Die primäre Workflow-Datei, die ein Release mit ZIP-Datei erstellt.
 *   **`.github/workflows/setup-redaxo.yml`**: Die sekundäre Workflow-Datei, die einen PR erstellt.
+*   **`.github/workflows/docker-build.yml`**: Workflow zum Erstellen und Veröffentlichen von Docker Images.
+*   **`Dockerfile`**: Produktions-Docker-Image für REDAXO mit allen Addons.
+*   **`Dockerfile.dev`**: Entwicklungs-Docker-Image mit schnelleren Build-Zeiten.
+*   **`docker-compose.yml`**: Docker Compose Konfiguration für Produktionsumgebung.
+*   **`docker-compose.dev.yml`**: Docker Compose Konfiguration für Entwicklung.
 *   **`.github/files/`**: Verzeichnis mit den benötigten Setup-Dateien:
     * `addon.project.boot.php`
     * `console`
@@ -58,6 +79,56 @@ https://api.github.com/repos/yakamara/redaxo_yrewrite yrewrite
 Die Ordner können umbenannt werden, wenn das original dem key nicht entspricht. Hierzu nach der URL ein Leerzeichen gefolgt vom gewünschten Ordnernamen angeben. 
 
 ## Verwendung
+
+### Docker Verwendung (Empfohlen)
+
+Die einfachste Möglichkeit, REDAXO mit der modernen Struktur zu verwenden, ist über Docker:
+
+#### Schnellstart mit Docker
+
+```bash
+# Repository klonen
+git clone https://github.com/skerbis/REDAXO_MODERN_STRUCTURE.git
+cd REDAXO_MODERN_STRUCTURE
+
+# Mit Docker Compose starten (Produktion)
+docker-compose up -d
+
+# Oder für Entwicklung mit automatischem Rebuild
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+Nach dem Start ist REDAXO verfügbar unter:
+- **REDAXO Frontend**: http://localhost:8080
+- **REDAXO Backend**: http://localhost:8080/redaxo
+- **phpMyAdmin**: http://localhost:8081
+
+**Standard Datenbank-Konfiguration für Docker:**
+- Host: `database`
+- Datenbank: `redaxo`
+- Benutzer: `redaxo`
+- Passwort: `redaxo`
+
+#### Docker Images verwenden
+
+```bash
+# Produktions-Image verwenden
+docker run -p 8080:80 ghcr.io/skerbis/redaxo_modern_structure:latest
+
+# Entwicklungs-Image verwenden
+docker run -p 8080:80 ghcr.io/skerbis/redaxo_modern_structure:dev
+```
+
+#### Eigene Addons konfigurieren
+
+1. Passe die Datei `.github/files/addons.txt` an
+2. Rebuild das Docker Image:
+   ```bash
+   docker-compose build --no-cache
+   docker-compose up -d
+   ```
+
+### GitHub Actions Verwendung
 
 1. Forken 
 2. addons.txt anpassen

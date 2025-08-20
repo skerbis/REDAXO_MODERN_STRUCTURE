@@ -2,6 +2,22 @@
 
 Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit einer bestimmten Ordnerstruktur und der Möglichkeit, Addons zu installieren. Die Action ist für die manuelle Ausführung konzipiert und erstellt entweder ein Release mit einer ZIP-Datei (primärer Workflow) oder einen Pull Request (sekundärer Workflow).
 
+## 🐳 Docker Setup (Empfohlen)
+
+**Schnellster Weg zu REDAXO mit moderner Struktur:**
+
+```bash
+git clone https://github.com/skerbis/REDAXO_MODERN_STRUCTURE.git
+cd REDAXO_MODERN_STRUCTURE
+docker compose up -d
+```
+
+Fertig! REDAXO ist verfügbar unter: http://localhost:8080
+
+📖 **Weitere Informationen:**
+- [Docker Quickstart Guide](DOCKER.md)
+- [Docker Examples](DOCKER-EXAMPLES.md)
+
 ## Funktionsweise
 
 Die Action führt folgende Schritte aus:

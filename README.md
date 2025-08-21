@@ -17,6 +17,26 @@ Fertig! REDAXO ist verfügbar unter: http://localhost:8080
 📖 **Weitere Informationen:**
 - [Docker Quickstart Guide](DOCKER.md)
 - [Docker Examples](DOCKER-EXAMPLES.md)
+- [VSCode Extension Compatibility](VSCODE-COMPATIBILITY.md)
+
+## 🎯 VS Code Integration
+
+**NEU:** Vollständige Kompatibilität mit der [REDAXO Multi-Instances VSCode Extension](https://github.com/FriendsOfREDAXO/redaxo-multi-instances-vscode)!
+
+```bash
+# VSCode-kompatible Setup in 3 Schritten:
+./setup-vscode.sh --setup    # VSCode Modus einrichten
+./setup-vscode.sh --ssl      # Optional: SSL/HTTPS aktivieren  
+./setup-vscode.sh --start    # Services starten
+```
+
+**Features:**
+- 🎮 **VSCode Extension** - Instanzen direkt in VS Code verwalten
+- 🔒 **SSL/HTTPS Support** - Lokale Domains mit mkcert
+- 🚪 **Konfigurierbare Ports** - Für Apache, MySQL, phpMyAdmin
+- 📁 **Hosts-Integration** - Automatische Domain-Einträge
+
+👉 **Vollständige Anleitung:** [VSCode Compatibility Guide](VSCODE-COMPATIBILITY.md)
 
 ## Funktionsweise
 

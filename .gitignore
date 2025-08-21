@@ -1,6 +1,13 @@
 # Environment variables
 .env
 
+# VSCode Extension Compatibility Mode
+data/
+mysql-init/
+ssl/
+*.pem
+*.key
+
 # IDE
 .vscode/
 .idea/

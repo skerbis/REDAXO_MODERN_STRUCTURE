@@ -28,6 +28,18 @@ docker compose up -d
 docker compose -f docker-compose.dev.yml up -d
 ```
 
+**Für VSCode Extension Kompatibilität:**
+```bash
+# Setup für VSCode Extension 
+./setup-vscode.sh --setup
+./setup-vscode.sh --start
+
+# Oder manuell:
+docker compose -f docker-compose.vscode.yml up -d
+```
+
+> 💡 **VSCode Extension**: Für die beste Entwicklungserfahrung nutze die [REDAXO Multi-Instances VSCode Extension](https://github.com/FriendsOfREDAXO/redaxo-multi-instances-vscode). Vollständige Anleitung: [VSCode Compatibility Guide](VSCODE-COMPATIBILITY.md)
+
 ### 3. REDAXO Setup aufrufen
 
 Nach dem Start der Container ist REDAXO unter folgenden URLs verfügbar:

@@ -1,0 +1,103 @@
+# Docker Compose configuration compatible with redaxo-multi-instances-vscode extension
+# This file provides compatibility with the VSCode extension while maintaining
+# the modern structure's configurable ports and environment setup.
+
+services:
+  redaxo:
+    image: friendsofredaxo/redaxo:${REDAXO_IMAGE_TAG:-5-stable}
+    container_name: redaxo-${INSTANCE_NAME:-modern-structure}
+    ports:
+      - "${REDAXO_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    environment:
+      # REDAXO Configuration
+      - REDAXO_SERVER=${REDAXO_SERVER:-http://localhost:${REDAXO_PORT:-8080}}
+      - REDAXO_SERVERNAME=${REDAXO_SERVERNAME:-${INSTANCE_NAME:-modern-structure}}
+      - REDAXO_ERROR_EMAIL=${REDAXO_ERROR_EMAIL:-admin@${INSTANCE_NAME:-modern-structure}.local}
+      - REDAXO_LANG=${REDAXO_LANG:-de_de}
+      - REDAXO_TIMEZONE=${REDAXO_TIMEZONE:-Europe/Berlin}
+      
+      # Database Configuration
+      - REDAXO_DB_HOST=mysql
+      - REDAXO_DB_NAME=${DB_NAME:-redaxo}
+      - REDAXO_DB_LOGIN=${DB_USER:-redaxo}
+      - REDAXO_DB_PASSWORD=${DB_PASSWORD:-redaxo}
+      - REDAXO_DB_CHARSET=${DB_CHARSET:-utf8mb4}
+      
+      # Admin User Configuration
+      - REDAXO_ADMIN_USER=${REDAXO_ADMIN_USER:-admin}
+      - REDAXO_ADMIN_PASSWORD=${REDAXO_ADMIN_PASSWORD:-${DB_PASSWORD:-redaxo}}
+      
+      # MySQL Environment (for setup scripts)
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-redaxo}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-redaxo}
+      
+      # Instance Configuration
+      - INSTANCE_NAME=${INSTANCE_NAME:-modern-structure}
+      - HTTP_PORT=${REDAXO_PORT:-8080}
+      - HTTPS_PORT=${HTTPS_PORT:-8443}
+      - RELEASE_TYPE=${RELEASE_TYPE:-standard}
+      - SSL_ENABLED=${SSL_ENABLED:-false}
+    volumes:
+      # Data volumes compatible with VSCode extension structure
+      - ./data/redaxo:/var/www/html
+      - ./custom-setup.sh:/usr/local/bin/custom-setup.sh:ro
+      # SSL certificates (when SSL is enabled)
+      - ./ssl:/etc/ssl/certs:ro
+      - ./ssl:/etc/ssl/private:ro
+      - ./apache-ssl.conf:/usr/local/bin/apache-ssl.conf:ro
+    depends_on:
+      - mysql
+    networks:
+      - redaxo-network
+    restart: unless-stopped
+    command: >
+      sh -c "
+        if [ -f /usr/local/bin/custom-setup.sh ]; then
+          /usr/local/bin/custom-setup.sh
+        fi &&
+        apache2-foreground
+      "
+
+  mysql:
+    image: mariadb:${DB_VERSION:-10.11}
+    container_name: redaxo-${INSTANCE_NAME:-modern-structure}-mysql
+    environment:
+      # MariaDB Configuration
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-redaxo}
+      - MYSQL_DATABASE=${DB_NAME:-redaxo}
+      - MYSQL_USER=${DB_USER:-redaxo}
+      - MYSQL_PASSWORD=${DB_PASSWORD:-redaxo}
+      - MYSQL_CHARSET=${DB_CHARSET:-utf8mb4}
+      - MYSQL_COLLATION=${DB_COLLATION:-utf8mb4_unicode_ci}
+    ports:
+      - "${DATABASE_PORT:-3306}:3306"
+    volumes:
+      # Data volumes compatible with VSCode extension
+      - ./data/mysql:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - redaxo-network
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # Optional phpMyAdmin (matching modern structure)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    platform: linux/amd64,linux/arm64
+    container_name: redaxo-${INSTANCE_NAME:-modern-structure}-pma
+    ports:
+      - "${PHPMYADMIN_PORT:-8081}:80"
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: ${DB_USER:-redaxo}
+      PMA_PASSWORD: ${DB_PASSWORD:-redaxo}
+    depends_on:
+      - mysql
+    networks:
+      - redaxo-network
+    restart: unless-stopped
+
+networks:
+  redaxo-network:
+    driver: bridge

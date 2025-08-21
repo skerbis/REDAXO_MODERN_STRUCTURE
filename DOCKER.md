@@ -59,8 +59,13 @@ Du kannst verschiedene PHP und Datenbank Versionen verwenden:
 
 2. **Bearbeite die `.env` Datei:**
    ```env
-   # PHP Version (8.1, 8.2, 8.3, etc.)
-   PHP_VERSION=8.2
+   # PHP Version (8.1, 8.2, 8.3, 8.4, etc.)
+   PHP_VERSION=8.4
+   
+   # Port Configuration (change if ports are already in use)
+   REDAXO_PORT=8080
+   PHPMYADMIN_PORT=8081
+   DATABASE_PORT=3306
    
    # Database Type: mysql oder mariadb
    DB_TYPE=mariadb
@@ -84,10 +89,10 @@ Du kannst verschiedene PHP und Datenbank Versionen verwenden:
 ### Unterstützte Versionen
 
 **PHP Versionen:**
-- 8.1 (Standard)
-- 8.2
+- 8.4 (Standard)
 - 8.3
-- 8.4 (falls verfügbar)
+- 8.2
+- 8.1
 
 **MySQL Versionen:**
 - 5.7
@@ -153,11 +158,24 @@ Diese Volumes bleiben erhalten, auch wenn die Container gestoppt werden.
 ## Troubleshooting
 
 ### Port bereits belegt
-Falls Port 8080 bereits verwendet wird:
+Falls Ports bereits verwendet werden, nutze das Port-Checking-Script:
 ```bash
-# In docker-compose.yml oder docker-compose.dev.yml ändern
-ports:
-  - "8090:80"  # Statt 8080:80
+./check-ports.sh
+```
+
+Das Script prüft automatisch die Verfügbarkeit und schlägt Alternativen vor.
+
+Manuelle Konfiguration in der `.env` Datei:
+```bash
+# In .env Datei
+REDAXO_PORT=8090        # Statt 8080
+PHPMYADMIN_PORT=8082    # Statt 8081  
+DATABASE_PORT=3307      # Statt 3306
+```
+
+Oder direkt in der Kommandozeile:
+```bash
+REDAXO_PORT=8090 PHPMYADMIN_PORT=8082 docker compose up -d
 ```
 
 ### Container startet nicht

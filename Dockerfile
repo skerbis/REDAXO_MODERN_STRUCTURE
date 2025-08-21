@@ -1,5 +1,5 @@
 # Multi-stage build for REDAXO Modern Structure
-ARG PHP_VERSION=8.1
+ARG PHP_VERSION=8.4
 FROM php:${PHP_VERSION}-apache as builder
 
 # Install system dependencies
@@ -8,14 +8,25 @@ RUN apt-get update && apt-get install -y \
     unzip \
     jq \
     git \
+    build-essential \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
     libpng-dev \
     libwebp-dev \
     libxpm-dev \
     libzip-dev \
+    libicu-dev \
     zlib1g-dev \
     ca-certificates \
+    imagemagick \
+    libmagickwand-dev \
+    ffmpeg \
+    ghostscript \
+    webp \
+    jpegoptim \
+    optipng \
+    pngquant \
+    gifsicle \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure GD extension
@@ -24,8 +35,12 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-x
 # Install PHP extensions
 RUN docker-php-ext-install \
     gd \
+    intl \
     pdo_mysql \
     zip
+
+# Note: ImageMagick PHP extension is not yet available for PHP 8.4
+# The ImageMagick CLI tools are installed via system packages above
 
 # Set working directory
 WORKDIR /var/www/html
@@ -47,21 +62,32 @@ RUN ./setup-redaxo.sh
 RUN rm -f setup-redaxo.sh install-addons.sh
 
 # Production stage
-ARG PHP_VERSION=8.1
+ARG PHP_VERSION=8.4
 FROM php:${PHP_VERSION}-apache
 
 # Install system dependencies and PHP extensions
 RUN apt-get update && apt-get install -y \
     curl \
     unzip \
+    build-essential \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
     libpng-dev \
     libwebp-dev \
     libxpm-dev \
     libzip-dev \
+    libicu-dev \
     zlib1g-dev \
     ca-certificates \
+    imagemagick \
+    libmagickwand-dev \
+    ffmpeg \
+    ghostscript \
+    webp \
+    jpegoptim \
+    optipng \
+    pngquant \
+    gifsicle \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure GD extension
@@ -70,8 +96,12 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-x
 # Install PHP extensions
 RUN docker-php-ext-install \
     gd \
+    intl \
     pdo_mysql \
     zip
+
+# Note: ImageMagick PHP extension is not yet available for PHP 8.4
+# The ImageMagick CLI tools are installed via system packages above
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite

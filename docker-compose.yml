@@ -4,10 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        PHP_VERSION: ${PHP_VERSION:-8.1}
+        PHP_VERSION: ${PHP_VERSION:-8.4}
     container_name: redaxo-app
     ports:
-      - "8080:80"
+      - "${REDAXO_PORT:-8080}:80"
     environment:
       - APACHE_DOCUMENT_ROOT=/var/www/html/public
     volumes:
@@ -36,7 +36,7 @@ services:
       MARIADB_USER: ${DB_USER:-redaxo}
       MARIADB_PASSWORD: ${DB_PASSWORD:-redaxo}
     ports:
-      - "3306:3306"
+      - "${DATABASE_PORT:-3306}:3306"
     volumes:
       - redaxo_db:/var/lib/mysql
     networks:
@@ -46,9 +46,10 @@ services:
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
+    platform: linux/amd64,linux/arm64
     container_name: redaxo-pma
     ports:
-      - "8081:80"
+      - "${PHPMYADMIN_PORT:-8081}:80"
     environment:
       PMA_HOST: database
       PMA_USER: redaxo

@@ -215,3 +215,32 @@ docker compose -f docker-compose.dev.yml up -d
 ```
 
 Diese Version mountet das Projektverzeichnis, sodass Änderungen direkt sichtbar sind.
+
+## VSCode Integration
+
+Die moderne Struktur ist vollständig kompatibel mit der [REDAXO Multi-Instances VSCode Extension](https://github.com/FriendsOfREDAXO/redaxo-multi-instances-vscode).
+
+### Setup für VSCode Extension
+
+```bash
+# 1. VSCode-Kompatibilität einrichten
+./setup-vscode.sh --setup
+
+# 2. Optional: SSL/HTTPS aktivieren
+./setup-vscode.sh --ssl
+
+# 3. Services starten
+./setup-vscode.sh --start
+```
+
+### Wichtige Unterschiede VSCode-Modus
+
+| Feature | Standard | VSCode-Modus |
+|---------|----------|-------------|
+| **Images** | Custom gebaut | `friendsofredaxo/redaxo` |
+| **Services** | `redaxo`, `database` | `redaxo`, `mysql` |
+| **Volumes** | Named Volumes | Bind Mounts zu `./data/` |
+| **SSL** | Optional | Mit mkcert + Domains |
+| **Management** | CLI/Docker | VSCode Extension |
+
+👉 **Vollständige Anleitung:** [VSCode Compatibility Guide](VSCODE-COMPATIBILITY.md)

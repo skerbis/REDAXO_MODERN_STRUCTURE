@@ -127,6 +127,15 @@ setup_ssl() {
         else
             echo "SSL_ENABLED=true" >> .env
         fi
+        
+        # Update REDAXO_SERVER for HTTPS
+        HTTPS_PORT_FROM_ENV=$(grep "^HTTPS_PORT=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "8443")
+        if grep -q "REDAXO_SERVER=" .env; then
+            sed -i.bak "s|REDAXO_SERVER=.*|REDAXO_SERVER=https://$INSTANCE_NAME.local:$HTTPS_PORT_FROM_ENV|" .env
+        else
+            echo "REDAXO_SERVER=https://$INSTANCE_NAME.local:$HTTPS_PORT_FROM_ENV" >> .env
+        fi
+        
         print_success "SSL enabled in .env file"
     fi
     

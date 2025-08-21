@@ -10,7 +10,7 @@ services:
       - "${REDAXO_PORT:-8080}:80"
       - "${HTTPS_PORT:-8443}:443"
     environment:
-      # REDAXO Configuration
+      # REDAXO Configuration  
       - REDAXO_SERVER=${REDAXO_SERVER:-http://localhost:${REDAXO_PORT:-8080}}
       - REDAXO_SERVERNAME=${REDAXO_SERVERNAME:-${INSTANCE_NAME:-modern-structure}}
       - REDAXO_ERROR_EMAIL=${REDAXO_ERROR_EMAIL:-admin@${INSTANCE_NAME:-modern-structure}.local}

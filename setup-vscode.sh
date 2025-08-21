@@ -71,6 +71,32 @@ setup_vscode_mode() {
     mkdir -p mysql-init
     mkdir -p ssl
     
+    # Initialize modern structure in data/redaxo if not exists
+    if [ ! -d "data/redaxo/src" ] && [ ! -f "data/redaxo/public/index.php" ]; then
+        print_info "Initializing modern structure in data/redaxo..."
+        
+        # Check if we have the built structure already
+        if [ -d "public" ] && [ -d "src" ]; then
+            print_info "Copying existing modern structure to data/redaxo..."
+            cp -r public data/redaxo/
+            cp -r src data/redaxo/
+            cp -r var data/redaxo/
+            cp -r bin data/redaxo/
+            
+            # Create necessary directories with proper permissions
+            mkdir -p data/redaxo/var/log
+            mkdir -p data/redaxo/var/cache
+            mkdir -p data/redaxo/public/media
+            
+            print_success "Modern structure initialized in data/redaxo"
+        else
+            print_warning "Modern structure not built yet. The structure will be created when Docker builds the image."
+            print_info "To rebuild with latest addons, run: docker-compose -f docker-compose.vscode.yml build --no-cache"
+        fi
+    else
+        print_success "Modern structure already exists in data/redaxo"
+    fi
+    
     # Set proper permissions
     chmod +x custom-setup.sh
     
@@ -79,8 +105,9 @@ setup_vscode_mode() {
     echo ""
     print_info "Next steps:"
     echo "  1. Edit .env file to configure your instance"
-    echo "  2. Run: docker-compose -f docker-compose.vscode.yml up -d"
+    echo "  2. Run: ./setup-vscode.sh --start (or docker-compose -f docker-compose.vscode.yml up -d)"
     echo "  3. Open VS Code and install redaxo-multi-instances-vscode extension"
+    echo "  4. The modern structure with all addons will be available at data/redaxo/"
     echo ""
 }
 

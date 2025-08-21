@@ -23,11 +23,13 @@ This project includes multiple Docker Compose configurations for different use c
 ### `docker-compose.vscode.yml` (VSCode Extension Compatible)
 - **Purpose**: Compatible with [redaxo-multi-instances-vscode](https://github.com/FriendsOfREDAXO/redaxo-multi-instances-vscode) extension
 - **Features**:
-  - Uses `friendsofredaxo/redaxo` Docker images (not custom builds)
-  - Service names `redaxo` and `mysql` (expected by VSCode extension)
-  - Bind mounts to `./data/` directory structure
+  - **Custom-built REDAXO images with modern structure** (src/, public/, var/, bin/)
+  - **All pre-installed addons** from addons.txt included
+  - Service names `redaxo` and `mysql` (required by VSCode extension)
+  - Bind mounts to `./data/redaxo/` with complete modern structure
   - SSL/HTTPS support with custom domains
   - Compatible with VSCode extension's port management
+  - **Preserves all benefits of the modern structure**
 - **Usage**: `docker compose -f docker-compose.vscode.yml up -d`
 - **Setup**: Use `./setup-vscode.sh --setup` for easy configuration
 

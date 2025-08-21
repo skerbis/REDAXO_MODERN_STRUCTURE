@@ -4,43 +4,31 @@
 
 services:
   redaxo:
-    image: friendsofredaxo/redaxo:${REDAXO_IMAGE_TAG:-5-stable}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.4}
     container_name: redaxo-${INSTANCE_NAME:-modern-structure}
     ports:
       - "${REDAXO_PORT:-8080}:80"
       - "${HTTPS_PORT:-8443}:443"
     environment:
-      # REDAXO Configuration  
-      - REDAXO_SERVER=${REDAXO_SERVER:-http://localhost:${REDAXO_PORT:-8080}}
-      - REDAXO_SERVERNAME=${REDAXO_SERVERNAME:-${INSTANCE_NAME:-modern-structure}}
-      - REDAXO_ERROR_EMAIL=${REDAXO_ERROR_EMAIL:-admin@${INSTANCE_NAME:-modern-structure}.local}
-      - REDAXO_LANG=${REDAXO_LANG:-de_de}
-      - REDAXO_TIMEZONE=${REDAXO_TIMEZONE:-Europe/Berlin}
-      
-      # Database Configuration
-      - REDAXO_DB_HOST=mysql
-      - REDAXO_DB_NAME=${DB_NAME:-redaxo}
-      - REDAXO_DB_LOGIN=${DB_USER:-redaxo}
-      - REDAXO_DB_PASSWORD=${DB_PASSWORD:-redaxo}
-      - REDAXO_DB_CHARSET=${DB_CHARSET:-utf8mb4}
-      
-      # Admin User Configuration
-      - REDAXO_ADMIN_USER=${REDAXO_ADMIN_USER:-admin}
-      - REDAXO_ADMIN_PASSWORD=${REDAXO_ADMIN_PASSWORD:-${DB_PASSWORD:-redaxo}}
-      
-      # MySQL Environment (for setup scripts)
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD:-redaxo}
-      - MYSQL_PASSWORD=${DB_PASSWORD:-redaxo}
+      # Apache Configuration for modern structure
+      - APACHE_DOCUMENT_ROOT=/var/www/html/public
       
       # Instance Configuration
       - INSTANCE_NAME=${INSTANCE_NAME:-modern-structure}
       - HTTP_PORT=${REDAXO_PORT:-8080}
       - HTTPS_PORT=${HTTPS_PORT:-8443}
-      - RELEASE_TYPE=${RELEASE_TYPE:-standard}
       - SSL_ENABLED=${SSL_ENABLED:-false}
     volumes:
       # Data volumes compatible with VSCode extension structure
+      # Mount the entire project directory for development
       - ./data/redaxo:/var/www/html
+      # Override with persistent volumes for specific directories
+      - redaxo_media:/var/www/html/public/media
+      - redaxo_var:/var/www/html/var
       - ./custom-setup.sh:/usr/local/bin/custom-setup.sh:ro
       # SSL certificates (when SSL is enabled)
       - ./ssl:/etc/ssl/certs:ro
@@ -101,3 +89,7 @@ services:
 networks:
   redaxo-network:
     driver: bridge
+
+volumes:
+  redaxo_media:
+  redaxo_var:

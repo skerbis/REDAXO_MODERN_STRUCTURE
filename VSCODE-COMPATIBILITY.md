@@ -4,12 +4,15 @@ Diese Anleitung erklärt, wie du REDAXO Modern Structure mit der [redaxo-multi-i
 
 ## 🎯 Überblick
 
-Die VSCode Extension ermöglicht die einfache Verwaltung mehrerer REDAXO-Instanzen direkt in VS Code. Diese moderne Struktur ist jetzt vollständig kompatibel mit der Extension und bietet zusätzliche Funktionen:
+Die VSCode Extension ermöglicht die einfache Verwaltung mehrerer REDAXO-Instanzen direkt in VS Code. Diese moderne Struktur ist jetzt vollständig kompatibel mit der Extension und **behält die moderne Ordnerstruktur bei**:
 
+- ✅ **Moderne Ordnerstruktur** mit src/, public/, var/, bin/ Verzeichnissen
+- ✅ **Alle vorinstallierten Addons** aus addons.txt verfügbar
 - ✅ **Konfigurierbare Ports** für Apache, MySQL und phpMyAdmin
 - ✅ **SSL/HTTPS Support** mit benutzerdefinierten Domains
 - ✅ **Hosts-Datei Integration** für lokale Domains
 - ✅ **Flexible PHP/MariaDB Versionen**
+- ✅ **VSCode Extension Kompatibilität** (Service-Namen: redaxo + mysql)
 - ✅ **Bestehende Funktionalität bleibt erhalten**
 
 ## 🚀 Schnellstart
@@ -102,11 +105,18 @@ echo "127.0.0.1 my-project.local" | sudo tee -a /etc/hosts
 - Service-Namen: `redaxo`, `database`
 - Optimiert für Produktion
 
+### Entwicklungs-Modus 
+- Custom Docker Images mit allen Addons
+- Bind Mount des gesamten Projekts für Live-Entwicklung
+- Service-Namen: `redaxo`, `database`  
+- Optimiert für lokale Code-Entwicklung
+
 ### VSCode-kompatible Modus
-- `friendsofredaxo/redaxo` Images
-- Bind Mounts nach `./data/`
-- Service-Namen: `redaxo`, `mysql` 
-- Optimiert für lokale Entwicklung
+- **Custom Docker Images mit moderner Struktur und allen Addons** 
+- Bind Mounts nach `./data/redaxo/` mit vollständiger moderner Ordnerstruktur
+- Service-Namen: `redaxo`, `mysql` (VSCode Extension Kompatibilität)
+- **Enthält src/, public/, var/, bin/ Struktur mit allen vorinstallierten Addons**
+- Optimiert für VSCode Extension Integration
 
 ## 📂 Verzeichnisstruktur (VSCode-Modus)
 
@@ -117,7 +127,11 @@ REDAXO_MODERN_STRUCTURE/
 ├── custom-setup.sh              # Setup-Script für Container
 ├── apache-ssl.conf              # SSL Apache-Konfiguration
 ├── data/                        # Bind Mount Verzeichnisse
-│   ├── redaxo/                 # REDAXO Installation
+│   ├── redaxo/                 # Vollständige moderne REDAXO Struktur
+│   │   ├── src/                # Quellcode (Addons, Core)
+│   │   ├── public/             # Öffentliches Web-Verzeichnis
+│   │   ├── var/                # Variable Daten (Cache, Logs)
+│   │   └── bin/                # Konsolenscripts
 │   └── mysql/                  # MySQL Daten
 ├── mysql-init/                 # MySQL Initialisierungsscripts  
 └── ssl/                        # SSL Zertifikate

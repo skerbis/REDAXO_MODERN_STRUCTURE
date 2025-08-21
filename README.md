@@ -32,6 +32,8 @@ Fertig! REDAXO ist verfügbar unter: http://localhost:8080
 
 **Features:**
 - 🎮 **VSCode Extension** - Instanzen direkt in VS Code verwalten
+- 📁 **Moderne Struktur** - Vollständige src/, public/, var/, bin/ Ordnerstruktur bleibt erhalten
+- 🔧 **Alle Addons** - Vorinstallierte Addons aus addons.txt verfügbar
 - 🔒 **SSL/HTTPS Support** - Lokale Domains mit mkcert
 - 🚪 **Konfigurierbare Ports** - Für Apache, MySQL, phpMyAdmin
 - 📁 **Hosts-Integration** - Automatische Domain-Einträge

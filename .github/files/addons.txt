@@ -1,5 +1,4 @@
 https://api.github.com/repos/FriendsOfREDAXO/cke5
-https://api.github.com/repos/FriendsOfREDAXO/dashboard
 https://api.github.com/repos/FriendsOfREDAXO/adminer
 https://api.github.com/repos/FriendsOfREDAXO/ffmpeg
 https://api.github.com/repos/FriendsOfREDAXO/vidstack
@@ -17,3 +16,5 @@ https://api.github.com/repos/tbaddade/redaxo_watson watson
 https://api.github.com/repos/yakamara/yform
 https://api.github.com/repos/yakamara/yrewrite
 https://api.github.com/repos/klxm/filepond_uploader
+https://api.github.com/repos/KLXM/upkeep
+https://github.com/repos/KLXM/info_center

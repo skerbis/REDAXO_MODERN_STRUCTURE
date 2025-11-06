@@ -17,4 +17,4 @@ https://api.github.com/repos/yakamara/yform
 https://api.github.com/repos/yakamara/yrewrite
 https://api.github.com/repos/klxm/filepond_uploader
 https://api.github.com/repos/KLXM/upkeep
-https://github.com/repos/KLXM/info_center
+https://api.github.com/repos/KLXM/info_center

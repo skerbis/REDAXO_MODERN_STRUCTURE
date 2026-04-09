@@ -43,7 +43,7 @@ jobs:
         run: |
           VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
           SHA="${{ steps.get_redaxo_release.outputs.redaxo_sha }}"
-          FILE="tmp/redaxo/core${VERSION}.zip"
+          FILE="tmp/redaxo/redaxo_${VERSION}.zip"   # <-- geändert
           curl -Ls "https://github.com/redaxo/core/releases/download/${VERSION}/redaxo_${VERSION}.zip" -o "${FILE}"
           echo "File SHA: $(sha1sum ${FILE})"
           if [[ "$(sha1sum ${FILE} | awk '{print $1}')" != "${SHA}" ]]; then
@@ -54,7 +54,7 @@ jobs:
       - name: Unzip REDAXO
         run: |
           VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
-          FILE="tmp/redaxo/core${VERSION}.zip"
+          FILE="tmp/redaxo/redaxo_${VERSION}.zip"
           unzip "${FILE}" -d public
       # 9. Yakamara Ordnerstruktur erstellen
       - name: Create Yakamara file structure

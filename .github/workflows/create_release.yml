@@ -30,9 +30,9 @@ jobs:
       - name: Get latest REDAXO release
         id: get_redaxo_release
         run: |
-          RELEASE_URL=$(curl -s "https://api.github.com/repos/redaxo/redaxo/releases/latest" | jq -r ".tag_name")
+          RELEASE_URL=$(curl -s "https://api.github.com/repos/redaxo/core/releases/latest" | jq -r ".tag_name")
           echo "redaxo_version=$RELEASE_URL" >> $GITHUB_OUTPUT
-          SHA=$(curl -Ls "https://github.com/redaxo/redaxo/releases/download/$RELEASE_URL/redaxo_$RELEASE_URL.zip" | shasum -a 1 | awk '{print $1}')
+          SHA=$(curl -Ls "https://github.com/redaxo/core/releases/download/$RELEASE_URL/redaxo_$RELEASE_URL.zip" | shasum -a 1 | awk '{print $1}')
           echo "redaxo_sha=$SHA" >> $GITHUB_OUTPUT
       # 6. Temporäre Verzeichnisse erstellen
       - name: Create temporary directories
@@ -43,8 +43,8 @@ jobs:
         run: |
           VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
           SHA="${{ steps.get_redaxo_release.outputs.redaxo_sha }}"
-          FILE="tmp/redaxo/redaxo_${VERSION}.zip"
-          curl -Ls "https://github.com/redaxo/redaxo/releases/download/${VERSION}/redaxo_${VERSION}.zip" -o "${FILE}"
+          FILE="tmp/redaxo/core${VERSION}.zip"
+          curl -Ls "https://github.com/redaxo/core/releases/download/${VERSION}/redaxo_${VERSION}.zip" -o "${FILE}"
           echo "File SHA: $(sha1sum ${FILE})"
           if [[ "$(sha1sum ${FILE} | awk '{print $1}')" != "${SHA}" ]]; then
             echo "ERROR: SHA-Hash is incorrect."
@@ -54,7 +54,7 @@ jobs:
       - name: Unzip REDAXO
         run: |
           VERSION="${{ steps.get_redaxo_release.outputs.redaxo_version }}"
-          FILE="tmp/redaxo/redaxo_${VERSION}.zip"
+          FILE="tmp/redaxo/core${VERSION}.zip"
           unzip "${FILE}" -d public
       # 9. Yakamara Ordnerstruktur erstellen
       - name: Create Yakamara file structure

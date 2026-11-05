@@ -1,3 +1,0 @@
-https://fonts.googleapis.com/css2?family=Open+Sans&display=swap
-https://fonts.googleapis.com/css2?family=Roboto&display=swap
-https://fonts.googleapis.com/css2?family=Lato:wght@400&display=swap

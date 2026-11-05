@@ -4,25 +4,55 @@ Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit 
 
 ## Funktionsweise
 
-Die Build-Logik liegt in `.github/scripts/build-redaxo.sh` und wird von beiden Workflows genutzt (lokal ausführbar mit `bash .github/scripts/build-redaxo.sh`). Sie führt folgende Schritte aus:
+Die Logik liegt in zwei Skripten, die beide Workflows nutzen und die sich auch lokal ausführen lassen:
 
-1.  **Neueste REDAXO Version ermitteln:** über die GitHub API (`redaxo/core`); optional kann beim Start des Workflows eine feste Version angegeben werden.
-2.  **REDAXO herunterladen:** und die SHA256-Prüfsumme gegen den von GitHub gelieferten Asset-Digest prüfen.
-3.  **Yakamara Ordnerstruktur erstellen:** REDAXO entpacken und in `public/`, `src/`, `var/` und `bin/` aufteilen.
-4.  **Setup Dateien kopieren:** aus `.github/files` an die richtige Position.
-5.  **Addons herunterladen:** aus `addons.txt` (neuestes Release, sonst Default-Branch) nach `src/addons`. Schlägt ein Download fehl, bricht der Build ab.
-6.  **Smoke-Test:** PHP-Syntaxcheck der Einstiegsdateien und `php bin/console --version`.
-7.  **Release erstellen (primärer Workflow):** GitHub Release mit ZIP-Datei, die die Version im Namen enthält (z.B. `redaxo-setup-5.21.6.zip`).
+*   **`.github/scripts/build-redaxo.sh`** baut die Struktur:
+    1.  Neueste REDAXO-Version über die GitHub API (`redaxo/core`) ermitteln. Optional lässt sich beim Start eine feste Version angeben.
+    2.  REDAXO herunterladen und die SHA256-Prüfsumme gegen den Asset-Digest von GitHub prüfen.
+    3.  REDAXO in `public/`, `src/`, `var/` und `bin/` aufteilen und die Setup-Dateien aus `.github/files` einsetzen.
+    4.  Addons aus `addons.txt` laden (neuestes Release, sonst aktueller Stand des Default-Branches). Schlägt ein Download fehl, bricht der Build ab.
+    5.  `versions.json` schreiben: REDAXO-Version und Version jedes Addons.
+    6.  Docker-Rezept (`compose.yaml`, `docker/`) und eine `.gitignore` für Projekt-Repos beilegen.
+*   **`.github/scripts/install-test.sh`** testet das Ergebnis in einer Kopie: REDAXO-Setup gegen eine echte MySQL-Datenbank, Installation aller Addons (inkl. Abhängigkeiten), Aufruf des Backends. Erst wenn das klappt, entsteht ein Release oder PR.
 
-    *Alternative:* **Pull Request erstellen (sekundärer Workflow):** Erstellt einen Pull Request mit den erstellten Änderungen.
+### Modi
 
-Die Workflows nutzen PHP 8.4. Node.js und Yarn werden nicht benötigt.
+| Modus | Verhalten |
+|---|---|
+| `fresh` | Neuinstallation. Bricht ab, wenn `public/`, `src/`, `var/` oder `bin/` schon existieren. |
+| `update` | Ersetzt nur den Core, die System-Addons, die Core-Assets und die Addons aus `addons.txt`. Das `project`-Addon, `var/` (Konfiguration, Daten), `public/media`, die Einstiegsdateien und eine angepasste `compose.yaml` bleiben unverändert. |
+| `auto` | `update`, wenn `src/core` existiert, sonst `fresh` (Standard beim PR-Workflow). |
+
+Lokal: `BUILD_MODE=update bash .github/scripts/build-redaxo.sh`
+
+### Workflows
+
+*   **Create REDAXO Release** läuft jeden Montag automatisch und lässt sich manuell starten. Ein Release entsteht nur, wenn sich die REDAXO-Version oder eine Addon-Version gegenüber dem letzten Release geändert hat (Vergleich über `versions.json`). Mit der Option *force* wird trotzdem eins erstellt. Die Release-Notes listen alle enthaltenen Versionen.
+*   **Setup REDAXO** baut bzw. aktualisiert die Struktur im Repository und erstellt einen Pull Request. Damit lässt sich ein bestehendes Projekt-Repo auf neue REDAXO- und Addon-Versionen bringen.
+
+Beide nutzen PHP 8.4 und MySQL 8.4. Node.js und Yarn werden nicht benötigt.
+
+## Lokale Entwicklung mit Docker
+
+Jedes Setup enthält eine `compose.yaml` mit PHP 8.4/Apache, MariaDB und Mailpit. Apache zeigt nur auf `public/`, alles andere liegt außerhalb des Webroots.
+
+```bash
+docker compose up -d
+```
+
+*   Backend: http://localhost:8080/redaxo/
+*   Datenbank im Setup: Host `db`, Benutzer `redaxo`, Passwort `redaxo`, Datenbank `redaxo`
+*   Mails: PHPMailer auf SMTP, Host `mailpit`, Port `1025`; Oberfläche unter http://localhost:8025/
+*   Ports ändern: `WEB_PORT=8081 DB_PORT=3308 MAIL_PORT=8026 docker compose up -d`
+*   Linux (Dateirechte): `HOST_UID=$(id -u) HOST_GID=$(id -g) docker compose up -d --build`
+
+Setup alternativ per Konsole: `docker compose exec web php bin/console setup:run`
 
 ## Konfiguration
 
 ### Eingabeparameter
 
-Diese Action hat keine Eingabeparameter. Die Konfiguration wird über Dateien im Repository gesteuert.
+Beim manuellen Start: REDAXO-Version (leer = neueste), beim Release-Workflow zusätzlich *force*, beim PR-Workflow der Modus.
 
 ### Dateien
 
@@ -34,6 +64,7 @@ Diese Action hat keine Eingabeparameter. Die Konfiguration wird über Dateien im
     * `index.backend.php`
     * `index.frontend.php`
     * `AppPathProvider.php`
+    * `docker/`: Vorlagen für `compose.yaml`, das Web-Image und die `.gitignore` des Projekts
     * **`addons.txt`**: Eine Textdatei, die die URLs der Addon Repositories enthält. Jede URL steht in einer neuen Zeile. Sie liegt unter `.github/files/addons.txt`.
 
 #### Beispiel für `addons.txt`
@@ -70,7 +101,7 @@ Die Ordner können umbenannt werden, wenn das original dem key nicht entspricht.
     *   Gehe in deinem Repository zu "Actions".
     *   Wähle den Workflow "Create REDAXO Release" aus und klicke auf "Run workflow".
 5.  **Lade die Release-ZIP herunter:**
-    *   Nach erfolgreicher Ausführung des Workflows wird ein Release mit einer ZIP-Datei erstellt, die die REDAXO-Version im Namen trägt (z.B. `redaxo-setup-5.15.0.zip`).
+    *   Nach erfolgreicher Ausführung des Workflows wird ein Release mit einer ZIP-Datei erstellt, die die REDAXO-Version im Namen trägt (z.B. `redaxo-setup-5.21.6.zip`).
     *   Das Release enthält alle Dateien, die für ein neues REDAXO-Projekt benötigt werden.
 
 **Alternativ (sekundärer Workflow):**
@@ -106,11 +137,14 @@ Die neue Ordnerstruktur zielt darauf ab, eine moderne Basis für REDAXO-Projekte
 │   │   └── [addon_name]/  # Hier landen die runtergeladenen Addons
 │   ├── core/            # REDAXO Core Dateien
 │   └── AppPathProvider.php # PathProvider Datei
+├── docker/web/            # Dockerfile, Apache-vHost, php.ini
 ├── var/                   # Variable Daten
 │   ├── cache/             # Cache Dateien
 │   ├── data/              # Daten Dateien
 │   └── log/               # Log Dateien
 ├── .gitignore             # Git Ignorier Datei
+├── compose.yaml           # Docker-Entwicklungsumgebung
+├── versions.json          # Enthaltene REDAXO- und Addon-Versionen
 └── LICENSE.md             # Lizenzdatei
 ```
 

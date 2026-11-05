@@ -7,14 +7,37 @@ on:
         description: 'REDAXO Version (leer = neueste)'
         required: false
         default: ''
+      mode:
+        description: 'auto = Update, falls schon installiert, sonst neu | fresh = nur Neuinstallation | update = nur Core und Addons ersetzen'
+        type: choice
+        options: [auto, fresh, update]
+        default: auto
 
 permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: setup-redaxo-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   setup:
     runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -23,15 +46,19 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: zip, curl, gd
+          extensions: zip, curl, gd, intl, mbstring, pdo_mysql
           tools: none
 
       - name: Build REDAXO
         id: build
         env:
           GH_TOKEN: ${{ github.token }}
+          BUILD_MODE: ${{ inputs.mode }}
           REDAXO_VERSION: ${{ inputs.redaxo_version }}
         run: bash .github/scripts/build-redaxo.sh
+
+      - name: Installation test
+        run: bash .github/scripts/install-test.sh
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v8
@@ -39,12 +66,19 @@ jobs:
           token: ${{ secrets.PAT_TOKEN || github.token }}
           branch: redaxo-setup
           base: ${{ github.ref_name }}
-          title: "Setup REDAXO ${{ steps.build.outputs.redaxo_version }}"
-          body: "Automatischer Setup der REDAXO Struktur (REDAXO ${{ steps.build.outputs.redaxo_version }})"
-          commit-message: "Setup REDAXO ${{ steps.build.outputs.redaxo_version }}"
+          title: "REDAXO ${{ steps.build.outputs.redaxo_version }} (${{ steps.build.outputs.build_mode }})"
+          body: |
+            Automatisch erstellt (Modus: `${{ steps.build.outputs.build_mode }}`), installiert und getestet mit PHP 8.4 und MySQL 8.4.
+
+            Enthaltene Versionen stehen in `versions.json`.
+          commit-message: "REDAXO ${{ steps.build.outputs.redaxo_version }} (${{ steps.build.outputs.build_mode }})"
           add-paths: |
             public
             src
             var
             bin
+            docker
+            compose.yaml
+            .gitignore
             LICENSE.md
+            versions.json

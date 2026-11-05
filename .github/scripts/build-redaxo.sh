@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 #
-# Baut eine REDAXO-Installation in moderner (Yakamara-)Ordnerstruktur
-# im aktuellen Arbeitsverzeichnis (= Repository-Root).
+# Baut oder aktualisiert eine REDAXO-Installation in moderner (Yakamara-)
+# Ordnerstruktur im aktuellen Arbeitsverzeichnis (= Repository-Root).
 #
 # Optionale Umgebungsvariablen:
+#   BUILD_MODE               auto (Standard) | fresh | update
+#                              fresh:  komplette Neuinstallation, bricht ab, wenn schon eine existiert
+#                              update: ersetzt nur Core, System-Addons und Addons aus addons.txt;
+#                                      project-Addon, var/, public/media, eigene Dateien bleiben unberührt
+#                              auto:   update, wenn src/core existiert, sonst fresh
 #   GH_TOKEN / GITHUB_TOKEN  Token für die GitHub-API (vermeidet Rate-Limits)
 #   REDAXO_VERSION           Feste REDAXO-Version statt "latest"
-#   GITHUB_OUTPUT            Wird von GitHub Actions gesetzt; erhält redaxo_version
+#   GITHUB_OUTPUT            Wird von GitHub Actions gesetzt; erhält redaxo_version und build_mode
 #
 set -euo pipefail
 
@@ -23,6 +28,45 @@ if [[ -n "$TOKEN" ]]; then
 fi
 
 log() { echo -e "\n==> $*"; }
+output() { if [[ -n "${GITHUB_OUTPUT:-}" ]]; then echo "$1=$2" >> "$GITHUB_OUTPUT"; fi; }
+
+# Verzeichnis ersetzen: Ziel löschen, Quelle verschieben
+replace_dir() {
+  rm -rf "$2"
+  mkdir -p "$(dirname "$2")"
+  mv "$1" "$2"
+}
+
+# ---------------------------------------------------------------------------
+# 0. Modus bestimmen
+# ---------------------------------------------------------------------------
+MODE="${BUILD_MODE:-auto}"
+if [[ "$MODE" == "auto" ]]; then
+  if [[ -d src/core ]]; then MODE=update; else MODE=fresh; fi
+fi
+case "$MODE" in
+  fresh)
+    for p in public src var bin; do
+      if [[ -e "$p" ]]; then
+        echo "ERROR: '$p' existiert bereits. Für bestehende Projekte BUILD_MODE=update verwenden," >&2
+        echo "       oder die Ordner vorher löschen." >&2
+        exit 1
+      fi
+    done
+    ;;
+  update)
+    if [[ ! -d src/core ]]; then
+      echo "ERROR: BUILD_MODE=update, aber src/core existiert nicht." >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "ERROR: Unbekannter BUILD_MODE '$MODE' (erlaubt: auto, fresh, update)." >&2
+    exit 1
+    ;;
+esac
+echo "Modus: $MODE"
+output build_mode "$MODE"
 
 # ---------------------------------------------------------------------------
 # 1. REDAXO Release ermitteln
@@ -43,9 +87,7 @@ if [[ -z "$VERSION" || "$VERSION" == "null" || -z "$ASSET_URL" ]]; then
   exit 1
 fi
 echo "Version: $VERSION"
-if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
-  echo "redaxo_version=$VERSION" >> "$GITHUB_OUTPUT"
-fi
+output redaxo_version "$VERSION"
 
 # ---------------------------------------------------------------------------
 # 2. REDAXO herunterladen und Prüfsumme verifizieren
@@ -66,37 +108,65 @@ if [[ "$ASSET_DIGEST" == sha256:* ]]; then
 else
   echo "WARNUNG: Kein Digest von GitHub geliefert, Prüfsumme wird übersprungen."
 fi
-unzip -tq "$ZIP" >/dev/null
 
 # ---------------------------------------------------------------------------
-# 3. Entpacken und Ordnerstruktur erstellen
+# 3. Ordnerstruktur in einem Staging-Verzeichnis erstellen
 # ---------------------------------------------------------------------------
 log "Ordnerstruktur erstellen"
-rm -rf public src var bin LICENSE.md
-unzip -q "$ZIP" -d public
+STAGE="$TMP_DIR/stage"
+mkdir -p "$STAGE/public"
+unzip -q "$ZIP" -d "$STAGE/public"
+(
+  cd "$STAGE"
+  mkdir -p var/log src
+  mv public/redaxo/bin bin
+  mv public/redaxo/cache var/cache
+  mv public/redaxo/data var/data
+  mv public/redaxo/src/addons src/addons
+  mv public/redaxo/src/core src/core
+  rm -rf public/redaxo/src
+  mv public/LICENSE.md LICENSE.md
+  rm -f public/README.md public/README.de.md
 
-mkdir -p var src
-mv public/redaxo/bin bin
-mv public/redaxo/cache var/cache
-mv public/redaxo/data var/data
-mv public/redaxo/src/addons src/addons
-mv public/redaxo/src/core src/core
-rmdir public/redaxo/src 2>/dev/null || true
-mv public/LICENSE.md LICENSE.md
-rm -f public/README.md public/README.de.md
+  cp "$FILES_DIR/addon.project.boot.php" src/addons/project/boot.php
+  cp "$FILES_DIR/console" bin/console
+  chmod +x bin/console
+  cp "$FILES_DIR/index.backend.php" public/redaxo/index.php
+  cp "$FILES_DIR/index.frontend.php" public/index.php
+  cp "$FILES_DIR/AppPathProvider.php" src/AppPathProvider.php
+)
 
-cp "$FILES_DIR/addon.project.boot.php" src/addons/project/boot.php
-cp "$FILES_DIR/console" bin/console
-chmod +x bin/console
-cp "$FILES_DIR/index.backend.php" public/redaxo/index.php
-cp "$FILES_DIR/index.frontend.php" public/index.php
-cp "$FILES_DIR/AppPathProvider.php" src/AppPathProvider.php
+if [[ "$MODE" == "fresh" ]]; then
+  mv "$STAGE"/{public,src,var,bin,LICENSE.md} "$ROOT"/
+  cp -R "$FILES_DIR/docker/." "$ROOT"/
+else
+  # Nur von REDAXO verwaltete Teile ersetzen
+  replace_dir "$STAGE/src/core" src/core
+  for dir in "$STAGE"/src/addons/*/; do
+    name="$(basename "$dir")"
+    [[ "$name" == "project" ]] && continue
+    echo "    System-Addon aktualisiert: $name"
+    replace_dir "$dir" "src/addons/$name"
+  done
+  replace_dir "$STAGE/public/assets/core" public/assets/core
+  [[ -d src/addons/project ]] || mv "$STAGE/src/addons/project" src/addons/project
+  [[ -f src/AppPathProvider.php ]] || cp "$STAGE/src/AppPathProvider.php" src/AppPathProvider.php
+  [[ -f bin/console ]] || { mkdir -p bin; cp "$STAGE/bin/console" bin/console; }
+  [[ -f public/index.php ]] || cp "$STAGE/public/index.php" public/index.php
+  [[ -f public/redaxo/index.php ]] || { mkdir -p public/redaxo; cp "$STAGE/public/redaxo/index.php" public/redaxo/index.php; }
+  mkdir -p var/log
+  cp "$STAGE/LICENSE.md" LICENSE.md
+  # Docker-Rezept nur ergänzen, nie eigene Anpassungen überschreiben
+  [[ -e compose.yaml ]] || { cp -R "$FILES_DIR/docker/docker" "$ROOT"/; cp "$FILES_DIR/docker/compose.yaml" "$ROOT"/; }
+  [[ -e .gitignore ]] || cp "$FILES_DIR/docker/.gitignore" "$ROOT"/
+fi
 
 # ---------------------------------------------------------------------------
 # 4. Addons laden
 # ---------------------------------------------------------------------------
 log "Addons laden"
 FAILED=()
+ADDONS_JSON="{}"
 
 while IFS= read -r line || [[ -n "$line" ]]; do
   line="${line%$'\r'}"
@@ -112,13 +182,16 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 
   echo "--- $REPO_PATH"
 
-  # Neuestes Release, sonst Default-Branch
+  # Neuestes Release, sonst aktueller Commit des Default-Branches
   if RELEASE=$("${CURL_API[@]}" "$API_URL/releases/latest" 2>/dev/null); then
     REF=$(jq -r '.tag_name' <<<"$RELEASE")
+    LABEL="$REF"
     echo "    Release: $REF"
   else
-    REF=$("${CURL_API[@]}" "$API_URL" | jq -r '.default_branch')
-    echo "    Kein Release, nutze Branch: $REF"
+    BRANCH=$("${CURL_API[@]}" "$API_URL" | jq -r '.default_branch')
+    REF=$("${CURL_API[@]}" "$API_URL/commits/$BRANCH" | jq -r '.sha')
+    LABEL="$BRANCH@${REF:0:7}"
+    echo "    Kein Release, nutze $LABEL"
   fi
 
   WORK="$TMP_DIR/addon-$REPO_NAME"
@@ -141,8 +214,9 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   fi
   echo "    -> src/addons/$ADDON_NAME"
 
-  rm -rf "src/addons/$ADDON_NAME"
-  mv "$ADDON_DIR" "src/addons/$ADDON_NAME"
+  replace_dir "$ADDON_DIR" "src/addons/$ADDON_NAME"
+  ADDONS_JSON=$(jq --arg n "$ADDON_NAME" --arg r "$REPO_PATH" --arg v "$LABEL" \
+    '.[$n] = {repo: $r, version: $v}' <<<"$ADDONS_JSON")
 done < "$ADDONS_FILE"
 
 if (( ${#FAILED[@]} )); then
@@ -151,7 +225,14 @@ if (( ${#FAILED[@]} )); then
 fi
 
 # ---------------------------------------------------------------------------
-# 5. Smoke-Test
+# 5. Manifest schreiben
+# ---------------------------------------------------------------------------
+log "versions.json schreiben"
+jq -n --arg v "$VERSION" --argjson a "$ADDONS_JSON" '{redaxo: $v, addons: $a}' > versions.json
+cat versions.json
+
+# ---------------------------------------------------------------------------
+# 6. Smoke-Test
 # ---------------------------------------------------------------------------
 log "Smoke-Test"
 for f in src/AppPathProvider.php public/index.php public/redaxo/index.php bin/console; do
@@ -159,4 +240,4 @@ for f in src/AppPathProvider.php public/index.php public/redaxo/index.php bin/co
 done
 php bin/console --version
 
-log "Fertig: REDAXO $VERSION"
+log "Fertig: REDAXO $VERSION ($MODE)"

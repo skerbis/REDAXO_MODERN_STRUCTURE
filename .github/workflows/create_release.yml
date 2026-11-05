@@ -7,13 +7,38 @@ on:
         description: 'REDAXO Version (leer = neueste)'
         required: false
         default: ''
+      force:
+        description: 'Release auch erstellen, wenn sich nichts geändert hat'
+        type: boolean
+        default: false
+  schedule:
+    # Jeden Montag 05:00 UTC auf neue REDAXO- oder Addon-Versionen prüfen
+    - cron: '0 5 * * 1'
 
 permissions:
   contents: write
 
+concurrency:
+  group: create-release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -22,26 +47,64 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: zip, curl, gd
+          extensions: zip, curl, gd, intl, mbstring, pdo_mysql
           tools: none
 
       - name: Build REDAXO
         id: build
         env:
           GH_TOKEN: ${{ github.token }}
+          BUILD_MODE: fresh
           REDAXO_VERSION: ${{ inputs.redaxo_version }}
         run: bash .github/scripts/build-redaxo.sh
 
+      - name: Installation test
+        run: bash .github/scripts/install-test.sh
+
+      - name: Check for changes since last release
+        id: changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force || false }}
+        run: |
+          if gh release download --pattern versions.json --output previous.json 2>/dev/null \
+             && [[ "$(jq -S . previous.json)" == "$(jq -S . versions.json)" ]]; then
+            if [[ "$FORCE" == "true" ]]; then
+              echo "Keine Änderungen, Release wird trotzdem erstellt (force)."
+              echo "release=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Keine Änderungen seit dem letzten Release, nichts zu tun."
+              echo "release=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "Änderungen gefunden (oder erstes Release)."
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+          rm -f previous.json
+
       - name: Create release
+        if: steps.changes.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN || github.token }}
           REDAXO_VERSION: ${{ steps.build.outputs.redaxo_version }}
         run: |
           RELEASE_TAG="redaxo-setup-${REDAXO_VERSION}-$(date +%Y%m%d%H%M)"
           ZIP_FILENAME="redaxo-setup-${REDAXO_VERSION}.zip"
-          zip -qr "$ZIP_FILENAME" public/ src/ var/ bin/ LICENSE.md
+          zip -qr "$ZIP_FILENAME" public/ src/ var/ bin/ docker/ compose.yaml .gitignore LICENSE.md versions.json
+
+          {
+            echo "Automatisch generiertes REDAXO Setup, installiert und getestet mit PHP 8.4 und MySQL 8.4."
+            echo
+            echo "| Paket | Version |"
+            echo "|---|---|"
+            echo "| **REDAXO** | ${REDAXO_VERSION} |"
+            jq -r '.addons | to_entries[] | "| [\(.key)](https://github.com/\(.value.repo)) | \(.value.version) |"' versions.json
+            echo
+            echo "Lokal starten: \`docker compose up -d\`, dann http://localhost:8080/redaxo/ aufrufen."
+          } > notes.md
+
           gh release create "$RELEASE_TAG" \
             --target "${GITHUB_SHA}" \
             --title "REDAXO Setup ${REDAXO_VERSION}" \
-            --notes "Automatisch generiertes REDAXO Setup mit Version ${REDAXO_VERSION}" \
-            "$ZIP_FILENAME"
+            --notes-file notes.md \
+            "$ZIP_FILENAME" versions.json

@@ -1,0 +1,15 @@
+{
+  "name": "mediaplace-build",
+  "version": "1.0.0",
+  "description": "Build tooling for the MediaPlace overlay core (src/mediaplace -> assets/mediaplace.js). See DEV.md.",
+  "private": true,
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "author": "Friends Of REDAXO",
+  "license": "MIT"
+}

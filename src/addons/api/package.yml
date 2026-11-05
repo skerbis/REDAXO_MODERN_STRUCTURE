@@ -1,0 +1,23 @@
+package: api
+version: '1.3'
+
+page:
+    title: 'translate:api-title'
+    icon: rex-icon fa-exchange
+    perm: api[]
+    subpages:
+        token:
+            title: 'translate:api_token'
+            perm: admin[]
+        openapi:
+            title: 'translate:api_openapi'
+        readme:
+            title: 'translate:readme'
+            itemClass: pull-right
+            subPath: README.md
+
+requires:
+    php: '>=8.2'
+    packages:
+        yform: '>=4.1.1'
+    redaxo: '^5.17.0'

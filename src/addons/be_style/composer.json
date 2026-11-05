@@ -1,0 +1,15 @@
+{
+    "type": "project",
+
+    "require": {
+        "scssphp/scssphp": "^1.13.0"
+    },
+
+    "config": {
+        "bump-after-update": true,
+        "platform": {
+            "php": "8.3.5"
+        },
+        "platform-check": false
+    }
+}

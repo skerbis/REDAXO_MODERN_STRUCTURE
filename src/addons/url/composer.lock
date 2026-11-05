@@ -1,0 +1,71 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "e595ef82bf964f94e818bd26f64b3418",
+    "packages": [
+        {
+            "name": "dergel/kit-urlparser",
+            "version": "2.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/dergel/Kit-UrlParser.git",
+                "reference": "d2de10b410680771aa8b2bef6e9a886ae952c4e0"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/dergel/Kit-UrlParser/zipball/d2de10b410680771aa8b2bef6e9a886ae952c4e0",
+                "reference": "d2de10b410680771aa8b2bef6e9a886ae952c4e0",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.6.0",
+                "psr/http-message": "^2.0"
+            },
+            "suggest": {
+                "ext-intl": "Required to parse URIs with IDNs"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Riimu\\Kit\\UrlParser\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Riikka Kalliomäki",
+                    "email": "riikka.kalliomaki@gmail.com",
+                    "homepage": "http://riimu.net"
+                }
+            ],
+            "description": "RFC 3986 compliant url parsing library with PSR-7 Uri component",
+            "homepage": "http://kit.riimu.net",
+            "keywords": [
+                "parser",
+                "psr-7",
+                "rfc3986",
+                "uri",
+                "url"
+            ],
+            "support": {
+                "source": "https://github.com/dergel/Kit-UrlParser/tree/2.3.0"
+            },
+            "time": "2026-04-17T10:40:09+00:00"
+        }
+    ],
+    "packages-dev": [],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": {},
+    "prefer-stable": false,
+    "prefer-lowest": false,
+    "platform": {},
+    "platform-dev": {},
+    "plugin-api-version": "2.6.0"
+}

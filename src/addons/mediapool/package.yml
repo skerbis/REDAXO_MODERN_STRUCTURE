@@ -1,0 +1,91 @@
+package: mediapool
+version: '2.18.6'
+author: 'Jan Kristinus'
+supportpage: https://github.com/redaxo/core
+
+rows_per_page: 100
+
+page:
+    title: translate:mediapool
+    popup: openMediaPool(); return false;
+    perm: media/hasMediaPerm
+    prio: 20
+    block: system
+    pjax: true
+    icon: rex-icon rex-icon-media
+    subpages:
+        media:     { title: translate:pool_file_list }
+        upload:    { title: translate:pool_file_insert }
+        structure: { title: translate:pool_cat_list,   perm: media/hasAll }
+        sync:      { title: translate:pool_sync_files, perm: media[sync] }
+
+blocked_extensions: [asp, aspx, bat, cfm, cgi, flv, hh, html, htaccess, htpasswd, ini, jsp, jsf, js, jsphp, log, mjs, pht, php, php3, php4, php5, php6, php7, php8, phar, pl, ps1, phtml, py, rb, rm, sh, shmtl, shtml, swf, wasm, wmv, wma, xhtml, xht, xml]
+
+# mime type allowlist. the list is checked after the blocked_extensions check from above has passed.
+allowed_mime_types:
+    # images
+    avif: [image/avif]
+    eps: [application/postscript, image/x-eps]
+    gif: [image/gif]
+    jpeg: [image/jpeg, image/pjpeg]
+    jpg: [image/jpeg, image/pjpeg]
+    png: [image/png]
+    svg: [image/svg+xml]
+    tif: [image/tiff]
+    tiff: [image/tiff]
+    webp: [image/webp]
+
+    # documents
+    doc: [application/msword, application/octet-stream, application/encrypted]
+    docx: [application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/octet-stream, application/encrypted]
+    dot: [application/msword, application/octet-stream, application/encrypted]
+    dotx: [application/vnd.openxmlformats-officedocument.wordprocessingml.template, application/octet-stream, application/encrypted]
+    pdf: [application/pdf]
+    pot: [application/vnd.ms-powerpoint]
+    potx: [application/vnd.openxmlformats-officedocument.presentationml.template]
+    pps: [application/vnd.ms-powerpoint]
+    ppsx: [application/vnd.openxmlformats-officedocument.presentationml.slideshow]
+    ppt: [application/vnd.ms-powerpoint]
+    pptx: [application/vnd.openxmlformats-officedocument.presentationml.presentation]
+    rtf: [application/rtf]
+    xls: [application/vnd.ms-excel, application/octet-stream, application/encrypted]
+    xlsx: [application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/octet-stream, application/encrypted]
+
+    # text
+    csv: [text/csv, application/octet-stream]
+    ics: [text/calendar]
+    md: [text/markdown]
+    srt: [text/plain]
+    txt: [text/plain, application/octet-stream]
+    vcf: [text/vcard]
+    vtt: [text/vtt]
+
+    # archives
+    gz: [application/x-gzip]
+    tar: [application/x-tar]
+    zip: [application/x-zip-compressed, application/zip]
+
+    # audio/video
+    m4a: [audio/mp4, audio/x-m4a]
+    m4v: [video/mp4, video/x-m4v]
+    mov: [video/quicktime]
+    movie: [video/quicktime]
+    mp3: [audio/mpeg]
+    mp4: [video/mp4]
+    mpe: [video/mpeg]
+    mpeg: [video/mpeg]
+    mpg: [video/mpeg]
+    oga: [audio/ogg, application/ogg]
+    ogg: [audio/ogg, video/ogg, application/ogg]
+    ogv: [video/ogg, application/ogg]
+    wav: [audio/x-wav, audio/wav, audio/vnd.wave]
+    weba: [audio/webm]
+    webm: [video/webm]
+
+allowed_doctypes: [avif, bmp, css, csv, doc, docx, eps, gif, gz, jpeg, jpg, mov, mp3, mp4, ogg, pdf, png, ppt, pptx, pps, ppsx, rar, rtf, srt, svg, swf, tar, tif, tiff, txt, vtt, webp, wma, xls, xlsx, zip]
+image_extensions: [avif, bmp, gif, jpeg, jpg, png, svg, tif, tiff, webp]
+sanitize_svgs: true
+
+requires:
+    php: '>=8.3'
+    redaxo: ^5.18.2

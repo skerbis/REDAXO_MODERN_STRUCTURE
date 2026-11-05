@@ -1,0 +1,25 @@
+package: cronjob
+version: '2.12.2'
+author: 'Gregor Harlan'
+supportpage: https://github.com/redaxo/core
+
+page:
+    title: 'translate:title'
+    perm: admin[]
+    pjax: true
+    icon: rex-icon rex-icon-cronjob
+    subpages:
+        cronjobs: { title: 'translate:title' }
+        log: { title: 'translate:log' }
+
+pages:
+    system/log/cronjob:
+        title: Cronjob
+        perm: admin[]
+
+requires:
+    php: '>=8.3'
+    redaxo: ^5.17.0
+
+console_commands:
+    cronjob:run: rex_command_cronjob_run

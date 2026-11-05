@@ -1,0 +1,1035 @@
+<?php
+
+/**
+ * @author Joachim Doerr
+ * @package redaxo5
+ * @license MIT
+ */
+
+namespace FriendsOfRedaxo\MForm;
+
+use FriendsOfRedaxo\MForm;
+use FriendsOfRedaxo\MForm\DTO\MFormItem;
+use FriendsOfRedaxo\MForm\Handler\MFormAttributeHandler;
+use FriendsOfRedaxo\MForm\Handler\MFormElementHandler;
+use FriendsOfRedaxo\MForm\Handler\MFormOptionHandler;
+use FriendsOfRedaxo\MForm\Handler\MFormParameterHandler;
+use FriendsOfRedaxo\MForm\Handler\MFormValueHandler;
+use FriendsOfRedaxo\MForm\Inputs\MFormInputsInterface;
+use FriendsOfRedaxo\MForm\Utils\HtmlToSvgConverter;
+use FriendsOfRedaxo\MForm\Utils\MFormLayoutPreviewHelper;
+use rex_addon;
+use rex_be_controller;
+use rex_path;
+
+use function array_key_exists;
+use function count;
+use function is_array;
+use function is_callable;
+use function is_int;
+use function strlen;
+
+use const PATHINFO_BASENAME;
+
+abstract class MFormElements
+{
+    /** @var array<int|string, MFormItem|MForm> */
+    private array $items = [];
+
+    private MFormItem $item;
+
+    /** @var array<string, mixed> */
+    private array $result = [];
+
+    /**
+     * @description this class contains all addFormElement and setElementOptions methods like addTextField, setLabel, addSelectField, setOptions
+     */
+    public function __construct()
+    {
+        if ('edit' === rex_request('function', 'string') || 'content/edit' === rex_be_controller::getCurrentPage()) {            // load rex vars
+            $this->result = MFormValueHandler::loadRexVars();
+        }
+    }
+
+    /**
+     * @description method to generate element array - add fields
+     * @param array<string, mixed>|null $attributes
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $parameter
+     */
+    public function addElement(string $type, float|int|string|null $id = null, ?string $value = null, ?array $attributes = null, ?array $options = null, ?array $parameter = null, ?int $catId = null, ?string $defaultValue = null): static
+    {
+        // remove ,
+        if (!is_int($id)) {
+            $id = str_replace(',', '.', (string) $id);
+        }
+
+        // create item element
+        $this->item = MFormElementHandler::createElement(count($this->items) + 1, $type, $id);
+        $this->items[$this->item->getId()] = $this->item; // add item element to items array
+
+        // execute to set default value and / or loaded value
+        MFormValueHandler::decorateItem($this->item, $this->result, $value, $defaultValue);
+
+        $this->setCategory($catId);
+
+        if (is_array($attributes) && count($attributes) > 0) {
+            $this->setAttributes($attributes);
+        }
+        if (is_array($options) && count($options) > 0) {
+            $this->setOptions($options);
+        }
+        if (is_array($parameter) && count($parameter) > 0) {
+            $this->setParameters($parameter);
+        }
+
+        return $this;
+    }
+
+    public function addHtml(?string $html = null): static
+    {
+        return $this->addElement('html', null, $html);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addHeadline(?string $value = null, ?array $attributes = null): static
+    {
+        return $this->addElement('headline', null, $value, $attributes);
+    }
+
+    public function addDescription(?string $value = null): static
+    {
+        return $this->addElement('description', null, $value);
+    }
+
+    public function addAlert(string $key, ?string $value = null): static
+    {
+        return $this->addElement('alert', null, $value, ['class' => 'alert-' . $key]);
+    }
+
+    public function addAlertInfo(?string $value = null): static
+    {
+        return $this->addAlert('info', $value);
+    }
+
+    public function addAlertWarning(?string $value = null): static
+    {
+        return $this->addAlert('warning', $value);
+    }
+
+    public function addAlertDanger(?string $value = null): static
+    {
+        return $this->addAlert('danger', $value);
+    }
+
+    public function addAlertError(?string $value = null): static
+    {
+        return $this->addAlertDanger($value);
+    }
+
+    public function addAlertSuccess(?string $value = null): static
+    {
+        return $this->addAlert('success', $value);
+    }
+
+    public function addForm(callable|MForm|string|null $form = null, bool $parse = false, bool $debug = false, bool $showWrapper = false): static
+    {
+        if (!$form instanceof MForm && is_callable($form)) {
+            $form = $form();
+        }
+        if ($form instanceof MForm) {
+            $form->setDebug($debug);
+            $form->setShowWrapper($showWrapper);
+            if (!$parse) {
+                $this->items[] = $form;
+                return $this;
+            }
+            $form = $form->show();
+        }
+        return $this->addHtml($form);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function addFieldsetArea(?string $legend = null, mixed $form = null, array $attributes = [], bool $parse = false, bool $showWrapper = false): static
+    {
+        return $this->addElement('fieldset', null, null, array_merge(['legend' => $legend], $attributes))
+            ->addForm($form, $parse, false, $showWrapper)
+            ->addElement('close-fieldset', null, null, $attributes);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function addColumnElement(int $col, mixed $form = null, array $attributes = [], bool $parse = false, bool $showWrapper = false): static
+    {
+        if (!array_key_exists('class', $attributes) || (isset($attributes['class']) && !str_contains($attributes['class'], 'col-'))) {
+            $attributes['class'] = "col-sm-$col" . ((isset($attributes['class'])) ? ' ' . $attributes['class'] : '');
+        }
+        return $this->addElement('column', null, null, $attributes)
+            ->addForm($form, $parse, false, $showWrapper)
+            ->addElement('close-column', null, null, $attributes);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function addInlineElement(string $label = '', mixed $form = null, array $attributes = [], bool $parse = false, bool $showWrapper = false): static
+    {
+        return $this->addElement('inline', null, null, $attributes)
+            ->setLabel($label)
+            ->addForm($form, $parse, false, $showWrapper)
+            ->addElement('close-inline', null, null, $attributes);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function addTabElement(string $label = '', mixed $form = null, bool $openTab = false, bool $pullNaviItemRight = false, array $attributes = [], bool $parse = false, bool $showWrapper = false): static
+    {
+        if (isset($attributes['tab-layout']) && !isset($attributes['data-group-tab-layout'])) {
+            $attributes['data-group-tab-layout'] = $attributes['tab-layout'];
+            unset($attributes['tab-layout']);
+        }
+
+        if (isset($attributes['tab-style']) && !isset($attributes['data-group-tab-style'])) {
+            $attributes['data-group-tab-style'] = $attributes['tab-style'];
+            unset($attributes['tab-style']);
+        }
+
+        $attributes = array_merge($attributes, ['data-group-open-tab' => $openTab, 'pull-right' => $pullNaviItemRight]);
+        return $this->addElement('tab', null, null, $attributes)
+            ->setLabel($label)
+            ->addForm($form, $parse, false, $showWrapper)
+            ->addElement('close-tab', null, null, $attributes);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function addCollapseElement(string $label = '', callable|MForm|string|null $form = null, bool $openCollapse = false, bool $hideToggleLinks = false, array $attributes = [], bool $accordion = false, bool $parse = false, bool $showWrapper = false): static
+    {
+        $hideToggleLinks = ($hideToggleLinks) ? 'true' : 'false';
+        $attributes = array_merge($attributes, [
+            'data-group-accordion' => (int) $accordion,
+            'data-group-hide-toggle-links' => $hideToggleLinks,
+            'data-group-open-collapse' => $openCollapse,
+        ]);
+
+        return $this->addElement('collapse', null, null, $attributes)
+            ->setLabel($label)
+            ->addForm($form, $parse, false, $showWrapper)
+            ->addElement('close-collapse', null, null, $attributes);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function addAccordionElement(string $label = '', callable|MForm|string|null $form = null, bool $openCollapse = false, bool $hideToggleLinks = false, array $attributes = []): static
+    {
+        return $this->addCollapseElement($label, $form, $openCollapse, $hideToggleLinks, $attributes, true);
+    }
+
+    /**
+     * Opens a Bootstrap modal dialog containing a sub-form. All fields inside the modal are
+     * saved together with the outer form on submission.
+     *
+     * @param string                        $label      Button label and modal title
+     * @param callable|MForm|string|null    $form       Sub-form (MForm instance, callable or HTML string)
+     * @param string                        $btnClass   Additional CSS class(es) for the trigger button (default: btn-default)
+     * @param array<string, mixed> $attributes Additional HTML attributes for the trigger button
+     * @param bool                          $parse      Whether to parse the sub-form immediately
+     */
+    public function addModalElement(string $label = '', callable|MForm|string|null $form = null, string $btnClass = 'btn-default', string $align = 'left', array $attributes = [], bool $parse = false, bool $showWrapper = false): static
+    {
+        $attributes['data-modal-btn-class'] = $btnClass;
+        $attributes['data-modal-align'] = $align;
+        return $this->addElement('modal', null, null, $attributes)
+            ->setLabel($label)
+            ->addForm($form, $parse, false, $showWrapper)
+            ->addElement('close-modal', null, null, $attributes);
+    }
+
+    /**
+     * Fieldset, das per JavaScript ein- oder ausgeblendet wird. Mehrere Bedingungen als Liste
+     * von Tripeln in `$sourceField`, `$operator` ist dann die Verknuepfung ('all'|'any').
+     *
+     * @param float|int|string|array<mixed> $sourceField
+     * @param array<string, mixed> $attributes
+     */
+    public function addConditionalFieldsetArea(
+        float|int|string|array $sourceField,
+        string $operator = '=',
+        string $compareValue = '',
+        string $legend = '',
+        callable|MForm|string|null $form = null,
+        array $attributes = [],
+        bool $parse = false,
+        bool $showWrapper = false,
+        string $action = 'show',
+    ): static {
+        $normalized = is_array($sourceField)
+            ? MFormAttributeHandler::normalizeConditions(['conditions' => $sourceField, 'logic' => $operator])
+            : MFormAttributeHandler::normalizeConditions(['field' => (string) $sourceField, 'op' => $operator, 'value' => $compareValue]);
+        if ([] === $normalized['conditions']) {
+            return $this->addFieldsetArea($legend, $form, $attributes, $parse, $showWrapper);
+        }
+
+        $first = $normalized['conditions'][0];
+        $attributes['class'] = trim(($attributes['class'] ?? '') . ' mform-conditional-target');
+        $attributes['data-mform-conditional-source'] = $first['field'];
+        $attributes['data-mform-conditional-operator'] = $first['op'];
+        $attributes['data-mform-conditional-value'] = $first['value'];
+        $attributes['data-mform-conditional-action'] = $action;
+        $conditionJson = MFormAttributeHandler::conditionsJson($normalized['conditions'], $action);
+        if (null !== $conditionJson) {
+            $attributes['data-mform-condition'] = $conditionJson;
+        }
+        if ('any' === $normalized['logic']) {
+            $attributes['data-mform-condition-logic'] = 'any';
+        }
+
+        return $this->addFieldsetArea($legend, $form, $attributes, $parse, $showWrapper);
+    }
+
+    /**
+     * @param array<string, mixed> $attributes ['btn_text' => 'Add Repeater Item', 'btn_class' => 'btn-default', 'confirm_delete_msg' => 'Do you really want to delete this item?', 'layout' => 'horizontal'|'vertical'|'inline']
+     */
+    public function addRepeaterElement(float|int|string $id, MForm $form, bool $open = true, bool $confirmDelete = true, array $attributes = [], bool $debug = false, bool $showWrapper = false): static
+    {
+        // Legacy-API kompatibel halten, intern aber neuen Repeater nutzen.
+        $options = $attributes;
+        $options['open'] = $open;
+        $options['confirm_delete'] = $confirmDelete;
+        $options['show_wrapper'] = $showWrapper;
+
+        if (isset($attributes['default_count']) && !isset($options['min'])) {
+            $options['default_count'] = (int) $attributes['default_count'];
+        }
+
+        return $this->addFlexRepeaterElement($id, $form, $options, $debug, $showWrapper);
+    }
+
+    /**
+     * JSON-basierter Repeater ohne Alpine.js.
+     *
+     * @param array<string, mixed> $options
+     */
+    public function addFlexRepeaterElement(float|int|string $id, MForm $form, array $options = [], bool $debug = false, bool $showWrapper = false): static
+    {
+        return $this->addElement('repeater', $id, null, $options)
+            ->addForm($form, false, $debug, $showWrapper)
+            ->addElement('close-repeater', $id, null, $options);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addInputField(string $typ, float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addElement($typ, $id, null, $attributes, null, null, null, $defaultValue);
+    }
+
+    /**
+     * Feld eines registrierten Feldtyps (MForm::registerFieldType()).
+     *
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addCustomField(string $type, float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addElement(strtolower(trim($type)), $id, null, $attributes, null, null, null, $defaultValue);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addHiddenField(float|int|string $id, ?string $value = null, ?array $attributes = null): static
+    {
+        return $this->addElement('hidden', $id, $value, $attributes);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addTextField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addInputField('text', $id, $attributes, $defaultValue);
+    }
+
+    /**
+     * HTML5-Eingabefelder (#409): duenne Wrapper um addInputField(), damit sie
+     * im Builder, in der Doku und in der Autovervollstaendigung als eigene
+     * Methoden erscheinen. min/max/step/pattern kommen ueber $attributes.
+     *
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addNumberField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addInputField('number', $id, $attributes, $defaultValue);
+    }
+
+    /**
+     * Schieberegler mit Live-Wertanzeige (assets/mform.js haengt ein <output> an).
+     *
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addRangeField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        $attributes = $attributes ?? [];
+        $attributes['data-mform-range'] = $attributes['data-mform-range'] ?? '1';
+        return $this->addInputField('range', $id, $attributes, $defaultValue);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addDateField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addInputField('date', $id, $attributes, $defaultValue);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addDateTimeField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addInputField('datetime-local', $id, $attributes, $defaultValue);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addTimeField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addInputField('time', $id, $attributes, $defaultValue);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addEmailField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addInputField('email', $id, $attributes, $defaultValue);
+    }
+
+    /**
+     * Nativer Browser-Farbwaehler (Pendant zu addColorSwatchField()).
+     *
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addColorField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addInputField('color', $id, $attributes, $defaultValue);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addTextAreaField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addInputField('textarea', $id, $attributes, $defaultValue);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addTextReadOnlyField(float|int|string $id, ?string $value = null, ?array $attributes = null): static
+    {
+        return $this->addElement('text-readonly', $id, $value, $attributes);
+    }
+
+    /** @param array<string, mixed>|null $attributes */
+    public function addTextAreaReadOnlyField(float|int|string $id, ?string $value = null, ?array $attributes = null): static
+    {
+        return $this->addElement('textarea-readonly', $id, $value, $attributes);
+    }
+
+    /**
+     * @param array<string, mixed>|null $attributes
+     * @param array<string|int, mixed>|null $options
+     * add select option fields
+     */
+    public function addOptionField(string $typ, mixed $id, ?array $attributes = null, ?array $options = null, ?string $defaultValue = null): static
+    {
+        return $this->addElement($typ, $id, null, $attributes, $options, null, null, $defaultValue);
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addSelectField(float|int|string $id, ?array $options = null, ?array $attributes = null, int $size = 1, ?string $defaultValue = null): static
+    {
+        $this->addOptionField('select', $id, $attributes, $options, $defaultValue);
+        if ($size > 1) {
+            $this->setSize($size);
+        }
+        return $this;
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addMultiSelectField(float|int|string $id, ?array $options = null, ?array $attributes = null, int $size = 3, ?string $defaultValue = null): static
+    {
+        $this->addOptionField('multiselect', $id, $attributes, $options, $defaultValue)
+            ->setMultiple()
+            ->setSize($size);
+        return $this;
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addCheckboxField(float|int|string $id, ?array $options = null, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addOptionField('checkbox', $id, $attributes, $options, $defaultValue);
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addToggleCheckboxField(float|int|string $id, ?array $options = null, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        if (!is_array($attributes)) {
+            $attributes = [];
+        }
+        $attributes['data-mform-toggle'] = 'toggle';
+        return $this->addCheckboxField($id, $options, $attributes, $defaultValue);
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addRadioField(float|int|string $id, ?array $options = null, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addOptionField('radio', $id, $attributes, $options, $defaultValue);
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     * @example
+     * $options = [];
+     * for ($i = 1; $i <= 20; $i++) {
+     *      $options[$i] = ['img' => "../theme/public/assets/backend/img/l$i.svg", 'label' => "Variant $i"];
+     * }
+     * $mform->addRadioImgField(4, $options, ['label' => 'Layout Type']);
+     */
+    public function addRadioImgField(float|int|string $id, ?array $options = null, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        $newOptions = [];
+
+        if (null !== $options) {
+            foreach ($options as $key => $option) {
+                if (isset($option['config'])) {
+                    $layoutHelper = new MFormLayoutPreviewHelper();
+                    $svg = $layoutHelper->generateLayoutPreview($option['config']);
+                    $newOptions[$key] = "<img src=\"{$svg}\"><span>{$option['label']}</span>";
+                } elseif (is_array($option) && isset($option['image'])) {
+                    $newOptions[$key] = $option['image'] . "<span>{$option['label']}</span>";
+                } elseif (is_array($option) && isset($option['svgIconSet'])) {
+                    $converter = new HtmlToSvgConverter();
+                    $attr = [
+                        'width' => '110px',
+                        'height' => '110px',
+                    ];
+                    $img = $converter->convertToImgTag($option['svgIconSet'], $attr);
+                    $newOptions[$key] = $img . "<span>{$option['label']}</span>";
+                } elseif (is_array($option) && isset($option['label']) && isset($option['img'])) {
+                    $newOptions[$key] = "<img src=\"{$option['img']}\"><span>{$option['label']}</span>";
+                }
+            }
+        } // end null check
+        $attributes['form-group-class'] = 'mform-inline-img-radios mform-inline-radios';
+
+        $this->addOptionField('radio', $id, $attributes, $newOptions, $defaultValue);
+        return $this;
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     * @example
+     * $options = [];
+     * $options[$i] = ['icon' => "fa fa-icon-0", 'label' => "Label Icon-0"];
+     * $mform->addRadioImgField(4, $options, ['label' => 'Label Text']);
+     */
+    public function addRadioIconField(float|int|string $id, ?array $options = null, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        $newOptions = [];
+        if (null !== $options) {
+            foreach ($options as $key => $option) {
+                if (is_array($option) && isset($option['label']) && isset($option['icon'])) {
+                    $newOptions[$key] = "<i class=\"{$option['icon']}\"></i><span> {$option['label']}</span>";
+                }
+            }
+        }
+        $attributes['form-group-class'] = 'mform-inline-icon-radios mform-inline-radios';
+
+        //        $this->addHtml('<div class="mform-inline-icon-radios mform-inline-radios">');
+        $this->addOptionField('radio', $id, $attributes, $newOptions, $defaultValue);
+        //        $this->addHtml('</div>');
+        return $this;
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addRadioColorField(float|int|string $id, ?array $options = null, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        $newOptions = [];
+        if (null !== $options) {
+            foreach ($options as $key => $option) {
+                if (is_array($option) && isset($option['label']) && isset($option['color'])) {
+                    if ('transparent' == $option['color']) {
+                        $newOptions[$key] = "<span style=\"background: linear-gradient(135deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 50%, rgba(255, 0, 0, 1) 50%, rgba(255, 0, 0, 1) 100%);\" data-toggle=\"tooltip\" data-placement=\"top\" title=\"{$option['label']}\"></span>";
+                    } else {
+                        $newOptions[$key] = "<span style=\"background-color:{$option['color']}\" data-toggle=\"tooltip\" data-placement=\"top\" title=\"{$option['label']}\"></span>";
+                    }
+                }
+            }
+        }
+        $attributes['form-group-class'] = 'mform-inline-color-radios mform-inline-radios';
+
+        //        $this->addHtml('<div class="mform-inline-color-radios mform-inline-radios">');
+        $this->addOptionField('radio', $id, $attributes, $newOptions, $defaultValue);
+        //        $this->addHtml('</div>');
+        return $this;
+    }
+
+    /**
+     * @param array<string|int, mixed>|null $options
+     * @param array<string, mixed>|null $attributes
+     * Renders a styled checkbox group – multiple checkboxes in a visually consistent widget.
+     * Selected values are stored as a comma-separated string in a single hidden input.
+     *
+     * @example
+     * $mform->addCheckboxGroupField("$id.0.tags", [
+     *     'news'  => 'Neuigkeiten',
+     *     'blog'  => 'Blog',
+     *     'event' => 'Events',
+     * ], ['label' => 'Kategorien']);
+     *
+     * Output: $item['tags'] → 'news,event'  (comma-separated string of checked values)
+     * Usage:  $selected = array_filter(explode(',', $item['tags'] ?? ''));
+     *         if (in_array('news', $selected)) { ... }
+     */
+    public function addCheckboxGroupField(float|int|string $id, ?array $options = null, ?array $attributes = null): static
+    {
+        $attributes ??= [];
+        $attributes['form-group-class'] = 'mform-checkbox-group-wrapper';
+        return $this->addElement('checkbox-group', $id, null, $attributes, $options);
+    }
+
+    /**
+     * Tags-Feld: freie Schlagworte als Pills, gespeichert kommasepariert (`news,blog`).
+     * `$suggestions` sind Vorschlaege (Liste von Strings); Attribute: `allow_new` (Standard true,
+     * false = nur Vorschlaege), `max` (0 = unbegrenzt), `placeholder`, `label`, `notice`.
+     *
+     * @param array<int|string, mixed>|null $suggestions
+     * @param array<string, mixed>|null $attributes
+     *
+     * @example
+     * $mform->addTagsField("$id.0.tags", ['News', 'Blog', 'Event'], ['label' => 'Schlagworte', 'max' => 5]);
+     * Output: $tags = array_filter(explode(',', $item['tags'] ?? ''));
+     */
+    public function addTagsField(float|int|string $id, ?array $suggestions = null, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        $attributes ??= [];
+        $attributes['form-group-class'] = trim(($attributes['form-group-class'] ?? '') . ' mform-tags-wrapper');
+        return $this->addElement('tags', $id, null, $attributes, $suggestions ?? [], null, null, $defaultValue);
+    }
+
+    /**
+     * Renders a color swatch picker – a text input with a preview square and a popup of predefined colors/classes.
+     * The stored value is the raw color value (e.g. "#ff0000") or a CSS class name (e.g. ".bg-primary").
+     *
+     * Option values can be a plain string label, or an array with 'label' and optional 'preview' (hex color for CSS classes):
+     *
+     * @param array<string, string|array{label: string, preview?: string}> $swatches
+     *
+     * @example
+     * $mform->addColorSwatchField('color', [
+     *     '#ffffff' => 'Weiß',
+     *     '#000000' => 'Schwarz',
+     *     '.bg-primary' => ['label' => 'Primärfarbe', 'preview' => '#2f77bc'],
+     * ], ['label' => 'Farbe']);
+     */
+    /**
+     * @param array<string, mixed>|null $swatches
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addColorSwatchField(float|int|string $id, ?array $swatches = null, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addElement('color-swatch', $id, null, $attributes, $swatches, null, null, $defaultValue);
+    }
+
+    /**
+     * @param array<string, mixed>|null $parameter
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addLinkField(float|int|string $id, ?array $parameter = null, mixed $catId = null, ?array $attributes = null): static
+    {
+        return $this->addElement('link', $id, null, $attributes, null, $parameter, $catId);
+    }
+
+    /**
+     * @param array<string, mixed>|null $parameter
+     * @param array<string, mixed>|null $attributes
+     * Einheitlicher MForm-Link-Wrapper auf Basis von custom_link (intern-link Fokus).
+     * Speichert den gewaehlten Linkwert im jeweiligen Value-Slot.
+     */
+    public function addMFormLinkField(float|int|string $id, ?array $parameter = null, mixed $catId = null, ?array $attributes = null): static
+    {
+        return $this->addElement('mform-link', $id, null, $attributes, null, $parameter, $catId);
+    }
+
+    /**
+     * @param array<string, mixed>|null $parameter
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addLinklistField(float|int|string $id, ?array $parameter = null, mixed $catId = null, ?array $attributes = null): static
+    {
+        return $this->addElement('linklist', $id, null, $attributes, null, $parameter, $catId);
+    }
+
+    /**
+     * @internal attributes ['data-intern'=>'enable','data-extern'=>'enable','data-media'=>'enable','data-mailto'=>'enable','data-tel'=>'disable', 'data-extern-link-prefix' => 'https://www.', 'data-link-category' => 14, 'data-media-category' => 1, 'data-media-type' => 'jpg,png', 'data-types' => 'jpg,png', 'types' => 'jpg,png'];
+     *
+    * $ylink = [['name' => 'Countries', 'table'=>'rex_ycountries', 'column' => 'de_de']]
+    * $ylinkWithCustomLabel = [['name' => 'Team', 'table'=>'rex_team_members', 'column' => 'name', 'label_columns' => ['name', 'surname']]]
+     * ->addCustomLinkField(1, ['label' => 'custom', 'data-intern'=>'disable', 'data-extern'=>'enable', 'ylink' => $ylink])
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addCustomLinkField(float|int|string $id, ?array $attributes = null, ?string $defaultValue = null): static
+    {
+        return $this->addElement('custom-link', $id, null, $attributes, null, null, null, $defaultValue);
+    }
+
+    /**
+     * Add a multiple custom-link field as own list widget.
+     *
+     * Each item is a fully-initialized custom link widget.
+     * Data is stored as a JSON array of link strings in a single hidden input.
+     *
+     * @param float|int|string $id Field id / value slot (1-10)
+     * @param array<string, mixed>|null $attributes Additional attributes (label, btn_add, data-intern, data-media, ...)
+     */
+    public function addCustomLinkMultipleField(float|int|string $id, ?array $attributes = null): static
+    {
+        return $this->addElement('custom-link-multi', $id, null, $attributes);
+    }
+
+    /**
+     * @param array<string, mixed>|null $parameter
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addMediaField(float|int|string $id, ?array $parameter = null, mixed $catId = null, ?array $attributes = null): static
+    {
+        return $this->addElement('media', $id, null, $attributes, null, $parameter, $catId);
+    }
+
+    /**
+     * @param array<string, mixed>|null $parameter
+     * @param array<string, mixed>|null $attributes
+     * Einheitlicher MForm-Media-Wrapper auf Basis von custom_link (media-link Fokus).
+     * Speichert den Dateinamen im jeweiligen Value-Slot.
+     */
+    public function addMFormMediaField(float|int|string $id, ?array $parameter = null, mixed $catId = null, ?array $attributes = null): static
+    {
+        return $this->addElement('mform-media', $id, null, $attributes, null, $parameter, $catId);
+    }
+
+    /**
+     * @param array<string, mixed>|null $parameter
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addMedialistField(float|int|string $id, ?array $parameter = null, mixed $catId = null, ?array $attributes = null): static
+    {
+        return $this->addElement('medialist', $id, null, $attributes, null, $parameter, $catId);
+    }
+
+    /**
+     * @param array<string, mixed>|null $parameter
+     * @param array<string, mixed>|null $attributes
+     */
+    public function addImagelistField(float|int|string $id, ?array $parameter = null, mixed $catId = null, ?array $attributes = null): static
+    {
+        return $this->addElement('imglist', $id, null, $attributes, null, $parameter, $catId);
+    }
+
+    /** @param array<string, mixed> $inputsConfig */
+    public function addInputs(float|int|string|null $id, string $filename, array $inputsConfig = []): static
+    {
+        if (null === $id) {
+            $id = '';
+        }
+        $inputsConfig['id'] = $id;
+        if ('' !== $filename) {
+            if ('/' == substr($filename, strlen($filename) - 1, 1)) {
+                $filename = substr($filename, 0, strlen($filename) - 1);
+            }
+            $basename = pathinfo($filename, PATHINFO_BASENAME);
+            if (str_contains($filename, '.php')) {
+                $filename = substr($filename, 0, strlen($filename) - 4);
+            }
+            $file = (file_exists(rex_path::addon('mform/inputs', $filename . '.php'))) ? rex_path::addon('mform/inputs', $filename . '.php') : $filename . '.php';
+            if (rex_addon::exists('mfragment')
+                && rex_addon::get('mfragment')->isAvailable()
+                && file_exists(rex_path::addon('mfragment/inputs', $filename . '.php'))) {
+                $file = rex_path::addon('mfragment/inputs', $filename . '.php');
+            }
+            if (file_exists($file)) {
+                include_once $file;
+                /** @var MFormInputsInterface $inputs */
+                $inputs = new $basename($this, $inputsConfig);
+                $this->items = array_merge($this->items, $inputs->generateInputsForm()->getItems());
+            }
+        }
+        return $this;
+    }
+
+    public function setLabel(string $label): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'label', $label);
+        return $this;
+    }
+
+    public function setPlaceholder(string $placeholder): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'placeholder', $placeholder);
+        return $this;
+    }
+
+    public function setFull(): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'full', true);
+        return $this;
+    }
+
+    public function setFormItemColClass(string $class): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'item-col-class', $class);
+        return $this;
+    }
+
+    public function setLabelColClass(string $class): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'label-col-class', $class);
+        return $this;
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function setAttributes(array $attributes): static
+    {
+        MFormAttributeHandler::setAttributes($this->item, $attributes);
+        return $this;
+    }
+
+    /**
+     * Sichtbarkeit an ein Quellfeld koppeln. Mehrere Bedingungen als Liste von Tripeln
+     * `[[1, '=', 'text'], [2, '!empty']]`; `$logic` 'all' (alle muessen zutreffen) oder 'any' (eine genuegt).
+     *
+     * @param float|int|string|array<mixed> $sourceField
+     */
+    public function setVisibleIf(float|int|string|array $sourceField, string $operator = '=', string $compareValue = '', string $logic = 'all'): static
+    {
+        return $this->applyConditions('visible_if', $sourceField, $operator, $compareValue, $logic);
+    }
+
+    /**
+     * Weitere Bedingung an die bestehende Sichtbarkeitsregel anhaengen.
+     */
+    public function addVisibleIf(float|int|string $sourceField, string $operator = '=', string $compareValue = ''): static
+    {
+        $current = $this->currentConditions();
+        $current['conditions'][] = ['field' => (string) $sourceField, 'op' => $operator, 'value' => $compareValue];
+        MFormAttributeHandler::addAttribute($this->item, 'hide' === $current['action'] ? 'hidden_if' : 'visible_if', $current);
+
+        return $this;
+    }
+
+    /**
+     * Verknuepfung mehrerer Bedingungen: 'all' (Standard) oder 'any'.
+     */
+    public function setVisibleIfLogic(string $logic): static
+    {
+        $current = $this->currentConditions();
+        if ([] === $current['conditions']) {
+            return $this;
+        }
+        $current['logic'] = 'any' === strtolower($logic) ? 'any' : 'all';
+        MFormAttributeHandler::addAttribute($this->item, 'hide' === $current['action'] ? 'hidden_if' : 'visible_if', $current);
+
+        return $this;
+    }
+
+    /**
+     * Gegenstueck zu setVisibleIf(): Feld ausblenden, wenn die Bedingung(en) zutreffen.
+     *
+     * @param float|int|string|array<mixed> $sourceField
+     */
+    public function setHiddenIf(float|int|string|array $sourceField, string $operator = '=', string $compareValue = '', string $logic = 'all'): static
+    {
+        return $this->applyConditions('hidden_if', $sourceField, $operator, $compareValue, $logic);
+    }
+
+    /** @param float|int|string|array<mixed> $sourceField */
+    private function applyConditions(string $attribute, float|int|string|array $sourceField, string $operator, string $compareValue, string $logic): static
+    {
+        $value = is_array($sourceField)
+            ? ['conditions' => $sourceField, 'logic' => $logic]
+            : ['field' => (string) $sourceField, 'op' => $operator, 'value' => $compareValue];
+        MFormAttributeHandler::addAttribute($this->item, $attribute, $value);
+
+        return $this;
+    }
+
+    /**
+     * Bedingungen des aktuellen Feldes aus den form-group-Attributen lesen (dort liegen sie als JSON).
+     *
+     * @return array{conditions: list<array{field: string, op: string, value: string}>, logic: string, action: string}
+     */
+    private function currentConditions(): array
+    {
+        $formGroupAttributes = $this->item->getAttributes()['form-group-attributes'] ?? [];
+        $formGroupAttributes = is_array($formGroupAttributes) ? $formGroupAttributes : [];
+        $json = $formGroupAttributes['data-mform-condition'] ?? null;
+        $decoded = is_string($json) ? json_decode($json, true) : null;
+
+        $conditions = [];
+        $action = 'show';
+        if (is_array($decoded)) {
+            foreach ($decoded as $condition) {
+                if (!is_array($condition) || !isset($condition['field'])) {
+                    continue;
+                }
+                $action = 'hide' === ($condition['action'] ?? 'show') ? 'hide' : 'show';
+                $conditions[] = ['field' => (string) $condition['field'], 'op' => (string) ($condition['op'] ?? '='), 'value' => (string) ($condition['value'] ?? '')];
+            }
+        }
+
+        return [
+            'conditions' => $conditions,
+            'logic' => 'any' === ($formGroupAttributes['data-mform-condition-logic'] ?? 'all') ? 'any' : 'all',
+            'action' => $action,
+        ];
+    }
+
+    public function setAttribute(string $name, mixed $value): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, $name, $value);
+        return $this;
+    }
+
+    public function setDefaultValue(string $value): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'default-value', $value);
+        return $this;
+    }
+
+    /** @param array<string|int, mixed> $options */
+    public function setOptions(array $options): static
+    {
+        MFormOptionHandler::setOptions($this->item, $options);
+        return $this;
+    }
+
+    public function setOption(int|string $key, mixed $value): static
+    {
+        MFormOptionHandler::addOption($this->item, $value, $key);
+        return $this;
+    }
+
+    /** @param array<string|int, mixed> $options */
+    public function setToggleOptions(array $options): static
+    {
+        $item = $this->item;
+        if ('html' == $this->item->getType()) {
+            $prevItem = $this->items[count($this->items) - 1];
+            if ($prevItem instanceof MFormItem) {
+                switch ($prevItem->getType()) {
+                    case 'radio':
+                    case 'checkbox':
+                    case 'select':
+                        $item = $prevItem;
+                        break;
+                }
+            }
+        }
+        MFormOptionHandler::toggleOptions($item, $options);
+        return $this;
+    }
+
+    /** @param array<string|int> $keys */
+    public function setDisableOptions(array $keys): static
+    {
+        MFormOptionHandler::disableOptions($this->item, $keys);
+        return $this;
+    }
+
+    public function setDisableOption(int|string $key): static
+    {
+        MFormOptionHandler::disableOption($this->item, $key);
+        return $this;
+    }
+
+    public function setSqlOptions(string $query): static
+    {
+        MFormOptionHandler::setSqlOptions($this->item, $query);
+        return $this;
+    }
+
+    public function setMultiple(): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'multiple', 'multiple');
+        return $this;
+    }
+
+    public function setSize(int $size): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'size', $size);
+        return $this;
+    }
+
+    public function setCategory(?int $catId): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'catId', $catId);
+        return $this;
+    }
+
+    /** @param array<string, mixed> $parameter */
+    public function setParameters(array $parameter): static
+    {
+        MFormParameterHandler::addParameters($this->item, $parameter);
+        return $this;
+    }
+
+    public function setParameter(string $name, mixed $value): static
+    {
+        MFormParameterHandler::addParameter($this->item, $name, $value);
+        return $this;
+    }
+
+    public function setTooltipInfo(?string $value = null, string $icon = ''): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'info-tooltip', $value);
+        MFormAttributeHandler::addAttribute($this->item, 'info-tooltip-icon', $icon);
+        return $this;
+    }
+
+    public function setTabIcon(string $icon): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'tab-icon', $icon);
+        return $this;
+    }
+
+    public function setCollapseInfo(?string $value = null, string $icon = ''): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'info-collapse', $value);
+        MFormAttributeHandler::addAttribute($this->item, 'info-collapse-icon', $icon);
+        return $this;
+    }
+
+    public function pullRight(): static
+    {
+        MFormAttributeHandler::addAttribute($this->item, 'pull-right', 1);
+        return $this;
+    }
+
+    /** @return array<int|string, MFormItem|MForm> */
+    public function getItems(): array
+    {
+        return $this->items;
+    }
+
+    /** @param array<int, MFormItem|MForm> $items */
+    public function setItems(array $items): static
+    {
+        $this->items = $items;
+        return $this;
+    }
+
+    /** @return array<string, mixed> */
+    public function getResult(): array
+    {
+        return $this->result;
+    }
+}

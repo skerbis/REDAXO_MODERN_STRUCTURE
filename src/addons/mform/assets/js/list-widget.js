@@ -1,0 +1,611 @@
+let mform_list_widget = '.mform-list-widget';
+let mformListWidgetCounter = 0;
+
+function mformListGetPopupCallbackStore() {
+    if (!window.mformListWidgetPopupCallbacks) {
+        window.mformListWidgetPopupCallbacks = {
+            linklist: {},
+            medialist: {}
+        };
+    }
+    return window.mformListWidgetPopupCallbacks;
+}
+
+function mformListInstallPopupBridge() {
+    if (window.mformListWidgetPopupBridgeInstalled) {
+        return;
+    }
+    window.mformListWidgetPopupBridgeInstalled = true;
+
+    const originalWriteREXLinklist = window.writeREXLinklist;
+    const originalWriteREXMedialist = window.writeREXMedialist;
+
+    window.writeREXLinklist = function (id) {
+        let result;
+        if (typeof originalWriteREXLinklist === 'function') {
+            result = originalWriteREXLinklist(id);
+        }
+
+        const key = String(id || '');
+        const cb = mformListGetPopupCallbackStore().linklist[key];
+        if (typeof cb === 'function') {
+            cb();
+        }
+
+        return result;
+    };
+
+    window.writeREXMedialist = function (id) {
+        let result;
+        if (typeof originalWriteREXMedialist === 'function') {
+            result = originalWriteREXMedialist(id);
+        }
+
+        const key = String(id || '');
+        const cb = mformListGetPopupCallbackStore().medialist[key];
+        if (typeof cb === 'function') {
+            cb();
+        }
+
+        return result;
+    };
+}
+
+function mformListRegisterPopupCallback(type, baseId, callback) {
+    mformListInstallPopupBridge();
+    const store = mformListGetPopupCallbackStore();
+    const key = String(baseId || '');
+    if (!store[type]) {
+        store[type] = {};
+    }
+    store[type][key] = callback;
+}
+
+function mformListResolveLinkOptionLabels(widget) {
+    const select = widget.find('select.mform-list-select');
+    const options = select.find('option');
+
+    if (!options.length) {
+        return;
+    }
+
+    options.each(function () {
+        const option = $(this);
+        const rawValue = String(option.val() || '').trim();
+
+        if (!rawValue) {
+            return;
+        }
+
+        $.getJSON(
+            'index.php',
+            { 'rex-api-call': 'mform_resolve_link', value: rawValue },
+            function (resp) {
+                const text = resp && typeof resp.text === 'string' ? resp.text.trim() : '';
+                if (!text) {
+                    return;
+                }
+
+                option.text(text);
+                mformListRender(widget, 'linklist');
+            }
+        );
+    });
+}
+
+$(document).on('rex:ready', function (e, container) {
+    setTimeout(function () {
+        if (!container || !container.find(mform_list_widget).length) {
+            return;
+        }
+        container.find(mform_list_widget).each(function () {
+            mformListWidgetInit($(this));
+        });
+    }, 2);
+});
+
+function mformListWidgetInit(widget) {
+    const type = String(widget.data('widget-type') || '').toLowerCase();
+    if (!type) return;
+
+    const ids = mformListEnsureIds(widget, type);
+    if (!ids || !ids.baseId) return;
+
+    const list = widget.find('ul.mform-list-items');
+    const select = widget.find('select.mform-list-select');
+    const hidden = widget.find('input.mform-list-value');
+
+    if (!select.find('option').length && hidden.length && hidden.val()) {
+        mformListBuildOptionsFromHidden(widget, type);
+    }
+
+    mformListRender(widget, type);
+    mformListWriteHidden(widget);
+
+    mformListRegisterPopupCallback(type, ids.baseId, function () {
+        mformListRender(widget, type);
+        mformListWriteHidden(widget);
+    });
+
+    mformListApplyView(widget, type, ids.baseId);
+    mformListInitDragDrop(widget);
+
+    list.off('click.mformListWidget').on('click.mformListWidget', 'li', function () {
+        mformListSelect(widget, $(this).data('index'));
+    });
+
+    widget.find('.mform-list-btn')
+        .off('click.mformListWidget keydown.mformListWidget')
+        .on('click.mformListWidget keydown.mformListWidget', function (event) {
+        if (event.type === 'keydown' && event.key !== 'Enter' && event.key !== ' ') {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (this.disabled || $(this).is('[disabled], .disabled, [aria-disabled="true"]')) {
+            return false;
+        }
+
+        const action = String($(this).data('action') || '');
+        const params = String(widget.attr('data-params') || '');
+        const baseId = ids.baseId;
+
+        if (action === 'delete') {
+            if (type === 'medialist') {
+                deleteREXMedialist(baseId);
+            } else {
+                deleteREXLinklist(baseId);
+            }
+            mformListRender(widget, type);
+            mformListWriteHidden(widget);
+            return false;
+        }
+
+        if (action === 'toggle-view' && type === 'medialist') {
+            mformListToggleView(widget, ids.baseId);
+            return false;
+        }
+
+        if (action === 'up' || action === 'down') {
+            if (type === 'medialist') {
+                moveREXMedialist(baseId, action);
+            } else {
+                moveREXLinklist(baseId, action);
+            }
+            mformListRender(widget, type);
+            mformListWriteHidden(widget);
+            return false;
+        }
+
+        if (type === 'medialist' && window.rex5MediaplaceBridge && window.rex5MediaplaceBridge.isActive()) {
+            if (action === 'open' || action === 'add') {
+                const filter = mformMediaplaceFilterFromParams(params);
+                const extensions = mformMediaplaceExtensionsFromParams(params);
+                const pickOptions = { multiple: true };
+                if (filter) pickOptions.filter = filter;
+                if (extensions.length) pickOptions.allowedExtensions = extensions;
+                const previewBase = String(widget.attr('data-preview-base') || '');
+
+                window.rex5MediaplaceBridge.pick(function (filenames) {
+                    const picked = Array.isArray(filenames) ? filenames : (filenames ? [filenames] : []);
+                    if (!picked.length) return;
+                    picked.forEach(function (file) {
+                        select.append(mformListBuildMediaOption(file, previewBase));
+                    });
+                    mformListRender(widget, type);
+                    mformListWriteHidden(widget);
+                }, pickOptions);
+                return false;
+            }
+
+            if (action === 'view') {
+                const filename = String(select.find('option:selected').first().val() || '');
+                if (filename) window.rex5MediaplaceBridge.show(filename);
+                return false;
+            }
+        }
+
+        let popup = null;
+
+        if (type === 'medialist') {
+            if (action === 'open') popup = openREXMedialist(baseId, params);
+            if (action === 'add') popup = addREXMedialist(baseId, params);
+            if (action === 'view') popup = viewREXMedialist(baseId, params);
+        }
+
+        if (type === 'linklist' && action === 'open') {
+            popup = openREXLinklist(baseId, params);
+        }
+
+        mformListBindPopupSync(popup, function () {
+            mformListRender(widget, type);
+            mformListWriteHidden(widget);
+        });
+
+        return false;
+    });
+}
+
+function mformListGetStoredView(baseId) {
+    if (!baseId) return null;
+    try {
+        const value = window.localStorage.getItem('mformListWidgetView:' + String(baseId));
+        return value === 'grid' || value === 'list' ? value : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function mformListSetStoredView(baseId, view) {
+    if (!baseId) return;
+    try {
+        window.localStorage.setItem('mformListWidgetView:' + String(baseId), view);
+    } catch (e) {
+        // ignore
+    }
+}
+
+function mformListApplyView(widget, type, baseId) {
+    if (type !== 'medialist') {
+        return;
+    }
+
+    const configuredViewsRaw = String(widget.attr('data-views') || '').toLowerCase();
+    let configuredViews = configuredViewsRaw ? configuredViewsRaw.split(',').map(function (view) {
+        return String(view || '').trim();
+    }).filter(function (view) {
+        return view === 'list' || view === 'grid' || view === 'gallery';
+    }) : ['list', 'gallery', 'grid'];
+
+    if (!configuredViews.length) {
+        configuredViews = ['list', 'gallery', 'grid'];
+    }
+
+    const stored = mformListGetStoredView(baseId);
+    let view = stored || String(widget.attr('data-view') || 'list').toLowerCase();
+    if (configuredViews.indexOf(view) === -1) {
+        view = configuredViews[0];
+    }
+
+    widget.attr('data-view', view);
+    widget.toggleClass('is-grid-view', view === 'grid' || view === 'gallery');
+    widget.toggleClass('is-gallery-view', view === 'gallery');
+    widget.toggleClass('is-list-view', view === 'list');
+
+    const btn = widget.find('.mform-list-btn[data-action="toggle-view"]');
+    const icon = btn.find('i');
+    const titleList = String(btn.attr('data-title-list') || 'List view');
+    const titleGrid = String(btn.attr('data-title-grid') || 'Grid view');
+    const titleGallery = String(btn.attr('data-title-gallery') || 'Gallery view');
+    const currentIndex = configuredViews.indexOf(view);
+    const nextView = configuredViews[(currentIndex + 1) % configuredViews.length] || 'list';
+    const nextTitle = nextView === 'gallery' ? titleGallery : (nextView === 'grid' ? titleGrid : titleList);
+
+    if (nextView === 'gallery') {
+        icon.removeClass('fa-list fa-th fa-th-large').addClass('fa-image');
+        btn.attr('title', nextTitle);
+    } else if (nextView === 'list') {
+        icon.removeClass('fa-image fa-th fa-th-large').addClass('fa-list');
+        btn.attr('title', nextTitle);
+    } else {
+        icon.removeClass('fa-list fa-image fa-th').addClass('fa-th-large');
+        btn.attr('title', nextTitle);
+    }
+}
+
+function mformListToggleView(widget, baseId) {
+    const current = String(widget.attr('data-view') || 'list').toLowerCase();
+    const configuredViewsRaw = String(widget.attr('data-views') || '').toLowerCase();
+    let configuredViews = configuredViewsRaw ? configuredViewsRaw.split(',').map(function (view) {
+        return String(view || '').trim();
+    }).filter(function (view) {
+        return view === 'list' || view === 'grid' || view === 'gallery';
+    }) : ['list', 'gallery', 'grid'];
+
+    if (!configuredViews.length) {
+        configuredViews = ['list', 'gallery', 'grid'];
+    }
+
+    const currentIndex = configuredViews.indexOf(current);
+    const nextIndex = currentIndex === -1 ? 0 : ((currentIndex + 1) % configuredViews.length);
+    const next = configuredViews[nextIndex];
+    widget.attr('data-view', next);
+    mformListSetStoredView(baseId, next);
+    mformListApplyView(widget, 'medialist', baseId);
+}
+
+function mformListEnsureIds(widget, type) {
+    const hidden = widget.find('input.mform-list-value');
+    const select = widget.find('select.mform-list-select');
+
+    const widgetBaseId = String(widget.attr('data-widget-id') || '');
+    const hiddenId = String(hidden.attr('id') || '');
+    const selectId = String(select.attr('id') || '');
+    let baseId = '';
+
+    // In dynamischen Containern (z. B. MBlock/Gridblock) werden REX_* IDs
+    // beim Reindexing angepasst. Diese IDs sind deshalb die zuverlässigste Quelle.
+    if (hiddenId && hiddenId.indexOf('REX_') === 0) {
+        baseId = hiddenId.replace(/^REX_(?:MEDIA|MEDIALIST|LINKLIST)_/, '');
+    }
+    if (!baseId && selectId && selectId.indexOf('REX_') === 0) {
+        baseId = selectId.replace(/^REX_(?:MEDIA|MEDIALIST|LINKLIST)_SELECT_/, '');
+    }
+    if (!baseId) {
+        baseId = widgetBaseId;
+    }
+    if (!baseId) {
+        mformListWidgetCounter += 1;
+        baseId = 'mfl_' + mformListWidgetCounter;
+    }
+
+    widget.attr('data-widget-id', baseId);
+
+    const hiddenPrefix = type === 'linklist' ? 'REX_LINKLIST_' : 'REX_MEDIALIST_';
+    const selectPrefix = type === 'linklist' ? 'REX_LINKLIST_SELECT_' : 'REX_MEDIALIST_SELECT_';
+
+    if (!hidden.attr('id')) {
+        hidden.attr('id', hiddenPrefix + baseId);
+    }
+    if (!select.attr('id')) {
+        select.attr('id', selectPrefix + baseId);
+    }
+
+    if (!select.attr('name')) {
+        const selectNamePrefix = type === 'linklist' ? 'REX_LINKLIST_SELECT' : 'REX_MEDIALIST_SELECT';
+        select.attr('name', selectNamePrefix + '[' + baseId + ']');
+    }
+
+    return { baseId: baseId };
+}
+
+function mformListBuildMediaOption(value, previewBase) {
+    const option = $('<option/>').attr('value', value).text(value);
+    const dotPos = value.lastIndexOf('.');
+    const ext = dotPos > -1 ? value.substring(dotPos + 1).toLowerCase() : 'file';
+    const isRasterImage = ['jpg', 'jpeg', 'png', 'gif'].indexOf(ext) !== -1;
+    const isModernImage = ['webp', 'avif'].indexOf(ext) !== -1;
+    const isSvg = ext === 'svg';
+    const isVideo = ['mp4', 'webm', 'ogg'].indexOf(ext) !== -1;
+    const isImage = isRasterImage || isModernImage || isSvg;
+    option.attr('data-ext', ext);
+    option.attr('data-is-image', isImage ? '1' : '0');
+    option.attr('data-media-kind', isVideo ? 'video' : (isImage ? 'image' : 'file'));
+    // Use direct /media/ for svg, avif, webp, video – media manager may not support them
+    if (isVideo || isSvg || isModernImage) {
+        option.attr('data-preview', '/media/' + value);
+    } else if (isRasterImage && previewBase) {
+        option.attr('data-preview', previewBase + encodeURIComponent(value));
+    }
+    return option;
+}
+
+function mformListBuildOptionsFromHidden(widget, type) {
+    const hidden = widget.find('input.mform-list-value');
+    const select = widget.find('select.mform-list-select');
+    const raw = String(hidden.val() || '');
+    if (!raw) return;
+
+    const parts = raw.split(',').map(function (item) {
+        return String(item || '').trim();
+    }).filter(function (item) {
+        return item !== '';
+    });
+
+    if (!parts.length) return;
+
+    const options = [];
+    const previewBase = String(widget.attr('data-preview-base') || '');
+    parts.forEach(function (value) {
+        if (type === 'medialist') {
+            options.push(mformListBuildMediaOption(value, previewBase));
+            return;
+        }
+        options.push($('<option/>').attr('value', value).text('Artikel ' + value));
+    });
+
+    select.empty();
+    options.forEach(function (opt) { select.append(opt); });
+
+    if (type === 'linklist') {
+        mformListResolveLinkOptionLabels(widget);
+    }
+}
+
+function mformListRender(widget, type) {
+    const list = widget.find('ul.mform-list-items');
+    const select = widget.find('select.mform-list-select');
+    const options = select.find('option');
+
+    list.empty();
+
+    if (!options.length) {
+        widget.addClass('is-empty');
+        return;
+    }
+
+    widget.removeClass('is-empty');
+
+    options.each(function (index) {
+        const option = $(this);
+        const selected = option.is(':selected');
+        const label = String(option.text() || option.val() || '');
+        const hideLabels = String(widget.attr('data-hide-label') || '0') === '1';
+        const handle = $('<span/>')
+            .addClass('mform-list-drag-handle')
+            .attr('aria-hidden', 'true')
+            .append($('<i/>').addClass('rex-icon fa-bars'));
+
+        const li = $('<li/>')
+            .attr('data-index', index)
+            .attr('tabindex', '0')
+            .toggleClass('is-selected', selected);
+
+        li.append(handle);
+
+        if (type === 'medialist') {
+            const previewBase = String(widget.attr('data-preview-base') || '');
+            let preview = String(option.attr('data-preview') || '');
+            const fileValue = String(option.val() || '');
+            const rawExt = (option.attr('data-ext') || fileValue.replace(/^.*\./, '') || 'file').toLowerCase();
+            const extDisplay = rawExt.toUpperCase();
+
+            // Derive media kind – prefer explicit attribute, fall back to extension
+            let mediaKind = String(option.attr('data-media-kind') || '').toLowerCase();
+            if (!mediaKind) {
+                const isVideo = ['mp4', 'webm', 'ogg'].indexOf(rawExt) !== -1;
+                const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg'].indexOf(rawExt) !== -1;
+                mediaKind = isVideo ? 'video' : (isImage ? 'image' : 'file');
+            }
+
+            // Build preview URL if not provided
+            if (!preview) {
+                if (mediaKind === 'video' || rawExt === 'svg' || rawExt === 'webp' || rawExt === 'avif') {
+                    preview = '/media/' + fileValue;
+                } else if (mediaKind === 'image' && previewBase) {
+                    preview = previewBase + encodeURIComponent(fileValue);
+                }
+            }
+
+            const media = $('<span/>').addClass('mform-list-item-media');
+            if (preview && mediaKind === 'video') {
+                const video = $('<video/>')
+                    .addClass('mform-list-item-thumb')
+                    .attr('playsinline', 'playsinline')
+                    .attr('autoplay', 'autoplay')
+                    .attr('muted', 'muted')
+                    .attr('loop', 'loop');
+                video.append(
+                    $('<source/>')
+                        .attr('src', preview)
+                        .attr('type', 'video/' + rawExt)
+                );
+                media.append(video);
+            } else if (preview) {
+                media.append(
+                    $('<img/>')
+                        .addClass('mform-list-item-thumb')
+                        .attr('src', preview)
+                        .attr('alt', '')
+                        .attr('loading', 'lazy')
+                );
+            } else {
+                media.append($('<span/>').addClass('mform-list-item-ext').text(extDisplay));
+            }
+
+            li.append(media);
+            if (!hideLabels) {
+                li.append($('<span/>').addClass('mform-list-item-label').text(label));
+            }
+        } else {
+            li.append($('<span/>').addClass('mform-list-item-label').text(label));
+        }
+
+        list.append(li);
+    });
+}
+
+function mformListInitDragDrop(widget) {
+    const list = widget.find('ul.mform-list-items').get(0);
+    if (!list) {
+        return;
+    }
+
+    const existingSortable = widget.data('mformListSortable');
+    if (existingSortable && typeof existingSortable.destroy === 'function') {
+        existingSortable.destroy();
+    }
+
+    if (typeof window.Sortable !== 'function') {
+        return;
+    }
+
+    const sortable = new window.Sortable(list, {
+        animation: 120,
+        draggable: 'li',
+        handle: '.mform-list-drag-handle',
+        ghostClass: 'mform-list-sortable-ghost',
+        chosenClass: 'mform-list-sortable-chosen',
+        onEnd: function () {
+            mformListSyncOrderFromDom(widget);
+        }
+    });
+
+    widget.data('mformListSortable', sortable);
+}
+
+function mformListSyncOrderFromDom(widget) {
+    const select = widget.find('select.mform-list-select');
+    const selectedValue = String(select.find('option:selected').first().val() || '');
+    const options = select.find('option').toArray();
+    const reordered = [];
+
+    widget.find('ul.mform-list-items li').each(function () {
+        const idx = parseInt(String($(this).attr('data-index') || ''), 10);
+        if (Number.isInteger(idx) && typeof options[idx] !== 'undefined') {
+            reordered.push(options[idx]);
+        }
+    });
+
+    if (reordered.length !== options.length) {
+        return;
+    }
+
+    select.empty();
+    reordered.forEach(function (option) {
+        select.append(option);
+    });
+
+    if (selectedValue !== '') {
+        const selectedOption = select.find('option').filter(function () {
+            return String($(this).val() || '') === selectedValue;
+        }).first();
+        if (selectedOption.length) {
+            selectedOption.prop('selected', true);
+        }
+    }
+
+    mformListRender(widget, String(widget.data('widget-type') || '').toLowerCase());
+    mformListWriteHidden(widget);
+}
+
+function mformListSelect(widget, index) {
+    const select = widget.find('select.mform-list-select');
+    select.find('option').prop('selected', false);
+    const option = select.find('option').eq(parseInt(index, 10));
+    if (option.length) {
+        option.prop('selected', true);
+    }
+    mformListRender(widget, String(widget.data('widget-type') || '').toLowerCase());
+    mformListWriteHidden(widget);
+}
+
+function mformListWriteHidden(widget) {
+    const select = widget.find('select.mform-list-select');
+    const hidden = widget.find('input.mform-list-value');
+
+    const values = [];
+    select.find('option').each(function () {
+        values.push(String($(this).val() || ''));
+    });
+
+    hidden.val(values.join(','));
+    hidden.trigger('input');
+    hidden.trigger('change');
+}
+
+function mformListBindPopupSync(popup, callback) {
+    if (!popup || typeof callback !== 'function') {
+        callback();
+        return;
+    }
+
+    try {
+        popup.addEventListener('beforeunload', function () {
+            window.setTimeout(callback, 40);
+        });
+    } catch (e) {
+        window.setTimeout(callback, 80);
+    }
+}

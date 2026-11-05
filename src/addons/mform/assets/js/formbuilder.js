@@ -1,0 +1,2507 @@
+/**
+ * MForm Visual Form Builder.
+ * Vanilla JS, depends only on the globally available Sortable from sortable.min.js.
+ *
+ * Architektur:
+ *  - Modell (state[]) ist single-source-of-truth.
+ *  - Sortable-Events mutieren das Modell direkt anhand evt.from / evt.to /
+ *    evt.oldIndex / evt.newIndex; wir scannen NICHT das DOM.
+ *  - Palette unterstützt sowohl Drag&Drop (Sortable mit pull:'clone') als
+ *    auch Click-to-Add. Klick und Drag stören sich nicht, weil Sortable
+ *    Klicks ohne tatsächlichen Drag durchlässt.
+ *  - Repeater dürfen maximal eine weitere Repeater-Ebene tief verschachtelt
+ *    werden (zwei Repeater-Ebenen insgesamt). Tiefer-Drops werden geblockt.
+ */
+(function () {
+    'use strict';
+
+    var initialised = false;
+    var initialisedCanvas = null;
+
+    function init() {
+        var canvas = document.querySelector('[data-fb-canvas]');
+        if (!canvas) return;
+        // Wenn bereits auf demselben Canvas initialisiert: nichts tun.
+        // (rex:ready feuert bei manchen REDAXO-Setups sonst eine doppelte
+        //  Initialisierung mit doppelten Event-Listenern und parallelen
+        //  state-Arrays, was zu "Geister"-Eintraegen nach Loeschen fuehrt.)
+        if (initialised && initialisedCanvas === canvas) return;
+        initialised = true;
+        initialisedCanvas = canvas;
+        run();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+    if (typeof jQuery !== 'undefined') {
+        jQuery(document).on('rex:ready', function () {
+            // Reset nur wenn der Canvas-Knoten ausgetauscht wurde (z.B. echter
+            // Page-Wechsel via PJAX). Bei reinem rex:ready ohne DOM-Wechsel
+            // ueberspringen wir die Re-Initialisierung.
+            var canvas = document.querySelector('[data-fb-canvas]');
+            if (canvas && canvas !== initialisedCanvas) {
+                initialised = false;
+                initialisedCanvas = null;
+                init();
+            }
+        });
+    }
+
+    function run() {
+
+        if (typeof Sortable === 'undefined') {
+            console.error('[mform-fb] Sortable is not available.');
+            return;
+        }
+
+        // Wie oft darf ein Repeater verschachtelt werden? 1 = zwei Ebenen.
+        var MAX_REPEATER_DEPTH = 1;
+
+        var TYPES = {
+            text:        { label: 'Text', method: 'addTextField',
+                props: ['label', 'defaultValue', 'placeholder', 'notice', 'cssClass', 'required', 'full'] },
+            number:      { label: 'Number', method: 'addNumberField',
+                props: ['label', 'defaultValue', 'placeholder', 'inputMin', 'inputMax', 'inputStep', 'notice', 'cssClass', 'required', 'full'] },
+            range:       { label: 'Range', method: 'addRangeField',
+                props: ['label', 'defaultValue', 'inputMin', 'inputMax', 'inputStep', 'notice', 'cssClass', 'full'] },
+            date:        { label: 'Date', method: 'addDateField',
+                props: ['label', 'defaultValue', 'inputMin', 'inputMax', 'notice', 'cssClass', 'required', 'full'] },
+            datetime:    { label: 'Date/Time', method: 'addDateTimeField',
+                props: ['label', 'defaultValue', 'inputMin', 'inputMax', 'notice', 'cssClass', 'required', 'full'] },
+            time:        { label: 'Time', method: 'addTimeField',
+                props: ['label', 'defaultValue', 'inputMin', 'inputMax', 'inputStep', 'notice', 'cssClass', 'required', 'full'] },
+            email:       { label: 'E-Mail', method: 'addEmailField',
+                props: ['label', 'defaultValue', 'placeholder', 'notice', 'cssClass', 'required', 'full'] },
+            color:       { label: 'Color (nativ)', method: 'addColorField',
+                props: ['label', 'defaultValue', 'notice', 'cssClass', 'full'] },
+            textarea:    { label: 'Textarea', method: 'addTextAreaField',
+                props: ['label', 'defaultValue', 'placeholder', 'notice', 'rows', 'cssClass', 'editor', 'editorProfile', 'required', 'full'] },
+            select:      { label: 'Select', method: 'addSelectField',
+                props: ['label', 'defaultValue', 'options', 'isMulti', 'notice', 'cssClass', 'required', 'full'] },
+            radio:       { label: 'Radio', method: 'addRadioField',
+                props: ['label', 'defaultValue', 'options', 'notice', 'cssClass', 'required'] },
+            checkbox:    { label: 'Checkbox', method: 'addCheckboxField',
+                props: ['label', 'defaultValue', 'options', 'notice', 'cssClass'] },
+            togglecheckbox: { label: 'Toggle Checkbox', method: 'addToggleCheckboxField',
+                props: ['label', 'defaultValue', 'options', 'notice', 'cssClass'] },
+            checkboxgroup: { label: 'Checkbox Group', method: 'addCheckboxGroupField',
+                props: ['label', 'defaultValue', 'options', 'cbgLayout', 'cbgMode', 'notice', 'cssClass'] },
+            tags:        { label: 'Tags', method: 'addTagsField',
+                props: ['label', 'defaultValue', 'options', 'tagsHelp', 'tagsAllowNew', 'tagsMax', 'placeholder', 'notice', 'cssClass'] },
+            hidden:      { label: 'Hidden', method: 'addHiddenField',
+                props: ['defaultValue'] },
+            headline:    { label: 'Headline', method: 'addHeadline',
+                props: ['label'] },
+            description: { label: 'Description', method: 'addDescription',
+                props: ['label'] },
+            alertinfo:   { label: 'Alert Info', method: 'addAlertInfo',
+                props: ['alertText'] },
+            alertwarning: { label: 'Alert Warning', method: 'addAlertWarning',
+                props: ['alertText'] },
+            alertdanger: { label: 'Alert Danger', method: 'addAlertDanger',
+                props: ['alertText'] },
+            alertsuccess: { label: 'Alert Success', method: 'addAlertSuccess',
+                props: ['alertText'] },
+            html:        { label: 'HTML-Block', method: 'addHtml',
+                props: ['htmlContent'] },
+            colorswatch: { label: 'Color Swatch', method: 'addColorSwatchField',
+                props: ['label', 'defaultValue', 'options', 'colorSwatchHelp', 'notice', 'cssClass'] },
+            // REDAXO core widgets
+            media:       { label: 'Media', method: 'addMediaField',
+                props: ['label', 'category', 'mediaType', 'a11yAlt', 'notice', 'cssClass'] },
+            medialist:   { label: 'Medialist', method: 'addMedialistField',
+                props: ['label', 'category', 'mediaType', 'a11yAlt', 'notice', 'cssClass'] },
+            imagelist:   { label: 'Imagelist', method: 'addImagelistField',
+                props: ['label', 'category', 'a11yAlt', 'notice', 'cssClass'] },
+            link:        { label: 'Link', method: 'addLinkField',
+                props: ['label', 'category', 'notice', 'cssClass'] },
+            linklist:    { label: 'Linklist', method: 'addLinklistField',
+                props: ['label', 'category', 'notice', 'cssClass'] },
+            customlink:  { label: 'Custom Link', method: 'addCustomLinkField',
+                props: ['label', 'notice', 'cssClass',
+                        'clTypeIntern', 'clTypeExtern', 'clTypeMedia', 'clTypeMailto', 'clTypeTel',
+                        'linkCategory', 'mediaCategory', 'externPrefix', 'mediaType', 'a11yAlt'] },
+            customlinkmultiple: { label: 'Custom Link Multiple', method: 'addCustomLinkMultipleField',
+                props: ['label', 'notice', 'cssClass', 'btnAdd',
+                        'clTypeIntern', 'clTypeExtern', 'clTypeMedia', 'clTypeMailto', 'clTypeTel',
+                        'linkCategory', 'mediaCategory', 'externPrefix', 'mediaType', 'a11yAlt'] },
+            textreadonly: { label: 'Text (readonly)', method: 'addTextReadOnlyField',
+                props: ['label', 'defaultValue', 'notice', 'cssClass', 'full'] },
+            textareareadonly: { label: 'Textarea (readonly)', method: 'addTextAreaReadOnlyField',
+                props: ['label', 'defaultValue', 'notice', 'rows', 'cssClass', 'full'] },
+            radioimg:    { label: 'Radio Image', method: 'addRadioImgField',
+                props: ['label', 'defaultValue', 'options', 'radioOptionsHelp', 'notice', 'cssClass'] },
+            radioicon:   { label: 'Radio Icon', method: 'addRadioIconField',
+                props: ['label', 'defaultValue', 'options', 'radioOptionsHelp', 'notice', 'cssClass'] },
+            radiocolor:  { label: 'Radio Color', method: 'addRadioColorField',
+                props: ['label', 'defaultValue', 'options', 'radioOptionsHelp', 'notice', 'cssClass'] },
+            repeater:    { label: 'Flex Repeater', method: 'addFlexRepeaterElement',
+                props: ['label', 'repeaterMin', 'repeaterMax', 'repeaterDefaultCount',
+                        'repeaterCollapsed', 'repeaterFirstOpen', 'repeaterShowToggleAll', 'repeaterShowAddButton',
+                        'repeaterOpen', 'repeaterCopyPaste', 'repeaterConfirmDelete',
+                        'repeaterConfirmDeleteMsg', 'repeaterBtnText', 'repeaterBtnClass', 'repeaterItemTitle', 'repeaterDescription'] },
+            tab:         { label: 'Tab', method: 'addTabElement',
+                props: ['label', 'tabPullRight', 'tabIcon', 'tabStyle', 'tabLayout'] },
+            fieldset:    { label: 'Fieldset', method: 'addFieldsetArea',
+                props: ['label'] },
+            modal:       { label: 'Modal', method: 'addModalElement',
+                props: ['label', 'modalBtnClass', 'modalAlign'] },
+            collapse:    { label: 'Collapse', method: 'addCollapseElement',
+                props: ['label', 'collapseOpen', 'collapseHideToggle'] },
+            accordion:   { label: 'Accordion', method: 'addAccordionElement',
+                props: ['label', 'collapseOpen', 'collapseHideToggle'] },
+            column:      { label: 'Column', method: 'addColumnElement',
+                props: ['columnSize'] },
+            inline:      { label: 'Inline', method: 'addInlineElement',
+                props: ['label'] }
+        };
+
+        // Wrapper, die Kinder aufnehmen (Canvas, Emitter, Import).
+        var CONTAINER_TYPES = ['repeater', 'tab', 'fieldset', 'modal', 'collapse', 'accordion', 'column', 'inline'];
+        // Neue Wrapper mit generischem Emitter (label|size, MForm::factory()->..., extra args)
+        var SIMPLE_WRAPPER_TYPES = ['collapse', 'accordion', 'column', 'inline'];
+        var RICH_RADIO_KEYS = { radioimg: 'img', radioicon: 'icon', radiocolor: 'color' };
+
+        var VISIBILITY_PROPS = ['visibilityEnabled', 'visibilityConditions'];
+        var CONDITION_OPERATORS = [
+            ['eq', 'ist gleich'], ['neq', 'ist ungleich'], ['contains', 'enthaelt'], ['in', 'ist in Liste'],
+            ['gt', 'ist groesser als'], ['lt', 'ist kleiner als'], ['empty', 'ist leer'], ['not_empty', 'ist nicht leer']
+        ];
+
+        var state = [];
+        var nextId = 1;
+        var STORAGE_KEY = 'mform.formbuilder.state.v1';
+        // Klassische REDAXO-Module haben pro Slot-Typ ein Limit von 20 (REX_VALUE / REX_MEDIA / REX_LINK / ...).
+        // Der Builder vergibt fortlaufende IDs; ueber 20 hinaus werden Werte ggf. nicht mehr persistiert.
+        var slotWarningShown = false;
+        var activeItem = null;
+        var clipboard = null; // shallow item clone in memory for paste
+        var outputUses = { outputHelper: false, repeaterHelper: false };
+
+        var $canvas = document.querySelector('[data-fb-canvas]');
+        var $palette = document.querySelector('[data-fb-palette]');
+        var $paletteWrap = document.querySelector('[data-fb-palette-wrap]');
+        var $paletteSearch = document.querySelector('[data-fb-palette-search]');
+        var $paletteEmpty = document.querySelector('[data-fb-palette-empty]');
+        var $code = document.querySelector('[data-fb-code]');
+        var $output = document.querySelector('[data-fb-output]');
+        var $propsForm = document.querySelector('[data-fb-props-form]');
+        var $propsEmpty = document.querySelector('[data-fb-props-empty]');
+        var mformUi = window.mformUi || null;
+
+        $canvas.dataset.fbDepth = '0';
+
+        // ---- Model helpers --------------------------------------------------
+
+        function makeItem(type) {
+            var def = TYPES[type];
+            var item = {
+                uid: 'fb-' + (Math.random().toString(36).slice(2, 8)),
+                id: nextId++,
+                type: type,
+                label: def.label,
+                defaultValue: '',
+                placeholder: '',
+                inputMin: '',
+                inputMax: '',
+                inputStep: '',
+                notice: '',
+                cssClass: '',
+                rows: '',
+                category: '',
+                options: (type === 'select' || type === 'radio' || type === 'checkboxgroup') ? "1=Option 1\n2=Option 2"
+                    : (type === 'checkbox' || type === 'togglecheckbox') ? '1=Ja'
+                    : (type === 'tags' ? "News\nBlog\nEvent"
+                    : (type === 'radioimg' ? "1=Layout A|/assets/addons/project/img/layout-a.svg\n2=Layout B|/assets/addons/project/img/layout-b.svg"
+                    : (type === 'radioicon' ? "left=Links|fa fa-align-left\ncenter=Zentriert|fa fa-align-center"
+                    : (type === 'radiocolor' ? "primary=Primaer|#2f6ea8\nlight=Hell|#f3f6fb\nnone=Transparent|transparent" : '')))),
+                required: false,
+                full: false,
+                // Editor an Textareas: '' | tinymce | cke5 | markdown
+                editor: '',
+                editorProfile: '',
+                // Weitere Attribute (eine je Zeile, name=wert)
+                customAttrs: '',
+                // Select multiple
+                isMulti: false,
+                // CheckboxGroup
+                cbgLayout: 'horizontal',
+                cbgMode: 'checkbox',
+                // Tags
+                tagsAllowNew: true,
+                tagsMax: '',
+                // HTML-Block
+                htmlContent: '',
+                alertText: (type === 'alertinfo' || type === 'alertwarning' || type === 'alertdanger' || type === 'alertsuccess') ? 'Hinweis' : '',
+                // CustomLink
+                clTypeIntern: type === 'customlink' || type === 'customlinkmultiple',
+                clTypeExtern: type === 'customlink' || type === 'customlinkmultiple',
+                clTypeMedia: false,
+                clTypeMailto: false,
+                clTypeTel: false,
+                linkCategory: '',
+                mediaCategory: '',
+                externPrefix: '',
+                mediaType: '',
+                btnAdd: '',
+                // Repeater
+                repeaterMin: '',
+                repeaterMax: '',
+                repeaterDefaultCount: '',
+                repeaterCollapsed: false,
+                repeaterFirstOpen: false,
+                repeaterShowToggleAll: type === 'repeater' ? true : false,
+                repeaterShowAddButton: type === 'repeater' ? true : false,
+                repeaterCopyPaste: type === 'repeater' ? true : false,
+                repeaterConfirmDelete: type === 'repeater' ? true : false,
+                repeaterOpen: type === 'repeater' ? true : false,
+                repeaterConfirmDeleteMsg: '',
+                repeaterBtnText: '',
+                repeaterBtnClass: '',
+                repeaterItemTitle: '',
+                repeaterDescription: '',
+                // Tab
+                tabPullRight: false,
+                tabIcon: '',
+                tabStyle: '',
+                tabLayout: '',
+                // Modal
+                modalBtnClass: 'btn-default',
+                modalAlign: 'left',
+                // Collapse / Accordion / Column
+                collapseOpen: false,
+                collapseHideToggle: false,
+                columnSize: '6',
+                // A11y-Pruefung (med_alt) fuer Medien-Felder
+                a11yAlt: false,
+                visibilityEnabled: false,
+                visibilityLogic: 'all',
+                visibilityConditions: [],
+                children: CONTAINER_TYPES.indexOf(type) !== -1 ? [] : null
+            };
+            return item;
+        }
+
+        function findItem(uid, list) {
+            list = list || state;
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].uid === uid) return list[i];
+                if (list[i].children) {
+                    var hit = findItem(uid, list[i].children);
+                    if (hit) return hit;
+                }
+            }
+            return null;
+        }
+
+        function removeItem(uid, list) {
+            list = list || state;
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].uid === uid) { list.splice(i, 1); return true; }
+                if (list[i].children && removeItem(uid, list[i].children)) return true;
+            }
+            return false;
+        }
+
+        function deepCloneWithNewIds(item) {
+            var copy = JSON.parse(JSON.stringify(item));
+            function reId(node) {
+                node.uid = 'fb-' + (Math.random().toString(36).slice(2, 8));
+                node.id = nextId++;
+                if (node.children) node.children.forEach(reId);
+            }
+            reId(copy);
+            return copy;
+        }
+
+        function findParentList(uid, list) {
+            list = list || state;
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].uid === uid) return { list: list, index: i };
+                if (list[i].children) {
+                    var hit = findParentList(uid, list[i].children);
+                    if (hit) return hit;
+                }
+            }
+            return null;
+        }
+
+        function isContainerType(type) {
+            return CONTAINER_TYPES.indexOf(type) !== -1;
+        }
+
+        function isSimpleWrapperType(type) {
+            return SIMPLE_WRAPPER_TYPES.indexOf(type) !== -1;
+        }
+
+        function isConditionSourceType(type) {
+            return !isContainerType(type) && !isStructureOnlyItem(type);
+        }
+
+        // ---- Slots und Schluessel fuer den erzeugten Code --------------------
+        //
+        // Eine Vergabe fuer Eingabe-Code, Ausgabe-Code, Sichtbarkeitsbedingungen und
+        // die Anzeige im Canvas, damit alles zusammenpasst:
+        // - ausserhalb eines Repeaters (auch in Spalte, Fieldset, Tab, Collapse, Accordion,
+        //   Inline, Modal): Slot-Nummer je REDAXO-Slot-Typ, lueckenlos in Reihenfolge
+        //   (REX_VALUE 1-20, REX_MEDIA/REX_MEDIALIST/REX_LINK/REX_LINKLIST je 1-10)
+        // - innerhalb eines Repeaters: Schluessel aus dem Label, eindeutig ueber alle
+        //   Layout-Container dieses Repeaters (verschachtelte Repeater haben eigene Schluessel)
+        // - Ueberschrift, Beschreibung, HTML, Hinweise speichern nichts und bekommen nichts.
+        var SLOT_LIMITS = { value: 20, media: 10, medialist: 10, link: 10, linklist: 10 };
+        var SLOT_LABELS = { value: 'REX_VALUE', media: 'REX_MEDIA', medialist: 'REX_MEDIALIST', link: 'REX_LINK', linklist: 'REX_LINKLIST' };
+
+        function slotTypeFor(type) {
+            if (type === 'media') return 'media';
+            if (type === 'medialist' || type === 'imagelist') return 'medialist';
+            if (type === 'link') return 'link';
+            if (type === 'linklist') return 'linklist';
+            return 'value';
+        }
+
+        function computeNames(list) {
+            var byUid = {};
+            var counters = { value: 0, media: 0, medialist: 0, link: 0, linklist: 0 };
+            var overflow = [];
+
+            function walk(items, pool) {
+                (items || []).forEach(function (item) {
+                    if (isStructureOnlyItem(item.type)) {
+                        return;
+                    }
+                    if (isContainerType(item.type) && item.type !== 'repeater') {
+                        walk(item.children, pool);
+                        return;
+                    }
+                    var entry;
+                    if (pool) {
+                        var key = slugify(item.label, 'field_' + item.id);
+                        if (/^\d/.test(key)) {
+                            key = 'field_' + key;
+                        }
+                        var base = key, n = 2;
+                        while (pool[key]) { key = base + '_' + n++; }
+                        pool[key] = true;
+                        entry = { kind: 'key', key: key };
+                    } else {
+                        var slotType = slotTypeFor(item.type);
+                        var nr = ++counters[slotType];
+                        entry = { kind: 'slot', slotType: slotType, n: nr };
+                        if (nr > SLOT_LIMITS[slotType]) {
+                            overflow.push(SLOT_LABELS[slotType] + ' ' + nr + ' (' + (item.label || item.type) + ')');
+                        }
+                    }
+                    byUid[item.uid] = entry;
+                    if (item.type === 'repeater') {
+                        walk(item.children, {});
+                    }
+                });
+            }
+
+            walk(list, null);
+            return { byUid: byUid, counters: counters, overflow: overflow };
+        }
+
+        function collectMultiOptionCheckboxes(list) {
+            var out = [];
+            (list || []).forEach(function (item) {
+                if ((item.type === 'checkbox' || item.type === 'togglecheckbox') && parseOptions(item.options || '').length > 1) {
+                    out.push(item.label || item.type);
+                }
+                if (Array.isArray(item.children)) {
+                    out = out.concat(collectMultiOptionCheckboxes(item.children));
+                }
+            });
+            return out;
+        }
+
+        // Slot-Nummer (int) oder Repeater-Schluessel (string) eines Elements
+        function codeIdFor(item) {
+            var entry = computeNames(state).byUid[item.uid];
+            if (!entry) {
+                return item.id;
+            }
+            return entry.kind === 'slot' ? entry.n : entry.key;
+        }
+
+        function escapeHtmlText(value) {
+            return String(value).replace(/[&<>"']/g, function (ch) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+            });
+        }
+
+        function codeIdLabel(item) {
+            var entry = computeNames(state).byUid[item.uid];
+            if (!entry) {
+                return '';
+            }
+            return entry.kind === 'slot' ? SLOT_LABELS[entry.slotType] + ' ' + entry.n : '\u2192 ' + entry.key;
+        }
+
+        function supportsVisibility(type) {
+            return type === 'fieldset' || isConditionSourceType(type);
+        }
+
+        function sanitizeItem(raw) {
+            if (!raw || !raw.type || !TYPES[raw.type]) {
+                return null;
+            }
+
+            var item = JSON.parse(JSON.stringify(raw));
+            item.uid = (typeof item.uid === 'string' && item.uid !== '')
+                ? item.uid
+                : ('fb-' + (Math.random().toString(36).slice(2, 8)));
+
+            var parsedId = parseInt(item.id, 10);
+            item.id = Number.isFinite(parsedId) && parsedId > 0 ? parsedId : 1;
+
+            // Bedingungen: Builder-Format 1 (eine Bedingung in drei Props) -> Liste
+            if (!Array.isArray(item.visibilityConditions)) {
+                item.visibilityConditions = [];
+                if (item.visibilitySourceUid) {
+                    item.visibilityConditions.push({ sourceUid: String(item.visibilitySourceUid), operator: String(item.visibilityOperator || 'eq'), value: item.visibilityValue == null ? '' : String(item.visibilityValue) });
+                }
+            }
+            item.visibilityConditions = item.visibilityConditions
+                .filter(function (c) { return c && typeof c === 'object'; })
+                .map(function (c) { return { sourceUid: String(c.sourceUid || ''), operator: String(c.operator || 'eq'), value: c.value == null ? '' : String(c.value) }; });
+            item.visibilityLogic = item.visibilityLogic === 'any' ? 'any' : 'all';
+            item.visibilityEnabled = !!item.visibilityEnabled;
+            if (item.editor === undefined) {
+                item.editor = item.tinymce ? 'tinymce' : '';
+                item.editorProfile = item.tinymceProfile || '';
+            }
+            if (typeof item.customAttrs !== 'string') item.customAttrs = '';
+            delete item.tinymce;
+            delete item.tinymceProfile;
+            delete item.visibilitySourceUid;
+            delete item.visibilityOperator;
+            delete item.visibilityValue;
+
+            if (isContainerType(item.type)) {
+                var children = Array.isArray(item.children) ? item.children : [];
+                item.children = children
+                    .map(sanitizeItem)
+                    .filter(function (child) { return child !== null; });
+            } else {
+                item.children = null;
+            }
+
+            return item;
+        }
+
+        function collectMaxIdFromState(list) {
+            var max = 0;
+            (list || []).forEach(function (item) {
+                if (typeof item.id === 'number' && item.id > max) {
+                    max = item.id;
+                }
+                if (Array.isArray(item.children)) {
+                    var childMax = collectMaxIdFromState(item.children);
+                    if (childMax > max) {
+                        max = childMax;
+                    }
+                }
+            });
+            return max;
+        }
+
+        function persistBuilderState() {
+            try {
+                window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: state }));
+            } catch (_e) {
+                // ignore storage failures (private mode / blocked storage)
+            }
+        }
+
+        function clearPersistedBuilderState() {
+            try {
+                window.localStorage.removeItem(STORAGE_KEY);
+            } catch (_e) {
+                // ignore storage failures
+            }
+        }
+
+        function restoreBuilderState() {
+            try {
+                var raw = window.localStorage.getItem(STORAGE_KEY);
+                if (!raw) {
+                    return;
+                }
+
+                var parsed = JSON.parse(raw);
+                if (!parsed || !Array.isArray(parsed.state)) {
+                    return;
+                }
+
+                var restored = parsed.state
+                    .map(sanitizeItem)
+                    .filter(function (item) { return item !== null; });
+
+                state = restored;
+                nextId = collectMaxIdFromState(state) + 1;
+                activeItem = null;
+            } catch (_e) {
+                // ignore malformed persisted data
+            }
+        }
+
+        // Tree-aware: depth of the deepest nested repeater chain inside `item`.
+        // Counts only repeater nesting (Tabs/Fieldsets sind UI-Wrapper und
+        // zaehlen nicht als eigene Repeater-Ebene), aber traversiert dadurch).
+        function maxRepeaterSubtreeDepth(item) {
+            if (!item) return 0;
+            var children = item.children || [];
+            var deepest = 0;
+            children.forEach(function (c) {
+                var add = (c.type === 'repeater') ? 1 : 0;
+                var d = add + maxRepeaterSubtreeDepth(c);
+                if (d > deepest) deepest = d;
+            });
+            return deepest;
+        }
+
+        // True if dropping `item` (any type) into a list at builder-depth `targetDepth`
+        // would exceed MAX_REPEATER_DEPTH considering the moved item's own subtree.
+        function wouldExceedRepeaterDepth(item, targetDepth) {
+            if (!item) return false;
+            return targetDepth + maxRepeaterSubtreeDepth(item) > MAX_REPEATER_DEPTH;
+        }
+
+        // ---- Rendering ------------------------------------------------------
+
+        // Track collapsed state per UID inside the BUILDER (not the same as the
+        // repeater's runtime `collapsed` option which only affects the rendered form).
+        var builderCollapsed = {};
+
+        function renderItem(item, depth) {
+            var el = document.createElement('div');
+            el.className = 'mform-fb__item mform-fb__item--' + item.type;
+            el.dataset.uid = item.uid;
+
+            var head = document.createElement('div');
+            head.className = 'mform-fb__item-head';
+            // Alle Container (auch Collapse, Accordion, Spalte, Inline) bekommen eine Ablageflaeche fuer Kinder.
+            var hasChildren = isContainerType(item.type);
+            if (item.type === 'column') {
+                el.style.setProperty('--fb-col', String(Math.min(12, Math.max(1, parseInt(item.columnSize, 10) || 6))));
+            }
+            var collapseBtn = hasChildren
+                ? '<button type="button" class="mform-fb__item-btn" data-fb-collapse title="Ein-/Ausklappen"><i class="rex-icon fa-chevron-' + (builderCollapsed[item.uid] ? 'right' : 'down') + '"></i></button>'
+                : '';
+            head.innerHTML =
+                '<span class="mform-fb__item-handle"><i class="rex-icon fa-arrows"></i></span>' +
+                collapseBtn +
+                '<span class="mform-fb__item-type">' + item.type + '</span>' +
+                '<span class="mform-fb__item-label"></span>' +
+                '<span class="mform-fb__item-id">' + escapeHtmlText(codeIdLabel(item)) + '</span>' +
+                '<span class="mform-fb__item-actions">' +
+                    '<button type="button" class="mform-fb__item-btn" data-fb-duplicate title="Duplizieren"><i class="rex-icon fa-clone"></i></button>' +
+                    '<button type="button" class="mform-fb__item-btn" data-fb-copy-item title="Kopieren"><i class="rex-icon fa-copy"></i></button>' +
+                    '<button type="button" class="mform-fb__item-btn" data-fb-paste-after title="Aus Zwischenablage einfuegen"><i class="rex-icon fa-paste"></i></button>' +
+                '</span>' +
+                '<button type="button" class="mform-fb__item-remove" data-fb-remove title="Loeschen"><i class="rex-icon fa-trash"></i></button>';
+            head.querySelector('.mform-fb__item-label').textContent = item.type === 'column'
+                ? (item.label && item.label !== 'Column' ? item.label + ' · ' : '') + 'Spalte ' + (parseInt(item.columnSize, 10) || 6) + '/12'
+                : (item.label || item.type);
+            head.addEventListener('click', function (e) {
+                if (e.target.closest('button')) return;
+                selectItem(item);
+            });
+            el.appendChild(head);
+
+            if (hasChildren) {
+                var nested = document.createElement('div');
+                nested.className = 'mform-fb__nested';
+                nested.dataset.fbNested = item.uid;
+                // Repeater-Depth zaehlt nur durch Repeater-Container. Tabs und
+                // Fieldsets sind reine Layout-Wrapper und verbrauchen keine
+                // Repeater-Ebene.
+                var nextDepth = item.type === 'repeater' ? (depth + 1) : depth;
+                nested.dataset.fbDepth = String(nextDepth);
+                if (builderCollapsed[item.uid]) {
+                    nested.style.display = 'none';
+                }
+                if (item.children.length === 0) {
+                    var hintWord = TYPES[item.type] ? TYPES[item.type].label : 'Wrapper';
+                    nested.innerHTML = '<p class="mform-fb__nested-hint">Felder hierher ziehen oder ' + hintWord + ' oben anklicken und dann links ein Feld waehlen</p>';
+                } else {
+                    item.children.forEach(function (c) { nested.appendChild(renderItem(c, nextDepth)); });
+                }
+                el.appendChild(nested);
+
+                Sortable.create(nested, {
+                    group: { name: 'fb-fields', pull: true, put: ['fb-palette', 'fb-fields'] },
+                    animation: 150,
+                    handle: '.mform-fb__item-handle',
+                    onAdd: handleSortAdd,
+                    onUpdate: handleSortUpdate,
+                    onRemove: handleSortRemove
+                });
+            }
+
+            return el;
+        }
+
+        // Single delegated click handler for all item action buttons.
+        $canvas.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-fb-remove], [data-fb-duplicate], [data-fb-copy-item], [data-fb-paste-after], [data-fb-collapse]');
+            if (!btn) return;
+            var itemEl = btn.closest('[data-uid]');
+            if (!itemEl) return;
+            e.stopPropagation();
+            e.preventDefault();
+            var uid = itemEl.dataset.uid;
+            var item = findItem(uid);
+            if (!item) return;
+
+            if (btn.hasAttribute('data-fb-remove')) {
+                removeItem(uid);
+                if (activeItem && activeItem.uid === uid) { activeItem = null; renderProps(); }
+                renderCanvas();
+                emitCode();
+                return;
+            }
+            if (btn.hasAttribute('data-fb-collapse')) {
+                builderCollapsed[uid] = !builderCollapsed[uid];
+                renderCanvas();
+                return;
+            }
+            if (btn.hasAttribute('data-fb-duplicate')) {
+                var posD = findParentList(uid);
+                if (!posD) return;
+                var cloneD = deepCloneWithNewIds(item);
+                posD.list.splice(posD.index + 1, 0, cloneD);
+                renderCanvas();
+                emitCode();
+                selectItem(cloneD);
+                return;
+            }
+            if (btn.hasAttribute('data-fb-copy-item')) {
+                clipboard = JSON.parse(JSON.stringify(item));
+                var msg = document.querySelector('[data-fb-copy-msg]');
+                if (msg) { msg.textContent = 'Element in Zwischenablage'; setTimeout(function () { msg.textContent = ''; }, 1500); }
+                return;
+            }
+            if (btn.hasAttribute('data-fb-paste-after')) {
+                if (!clipboard) {
+                    alert('Zwischenablage ist leer. Erst auf Kopieren druecken.');
+                    return;
+                }
+                var posP = findParentList(uid);
+                if (!posP) return;
+                // Determine builder-depth of the target list.
+                // Top-level list = state -> depth 0. Otherwise climb the DOM.
+                var targetDepth = 0;
+                if (posP.list !== state) {
+                    // Find any element inside this list to read data-fb-depth from.
+                    var sample = $canvas.querySelector('[data-uid="' + uid + '"]');
+                    var nestedEl = sample ? sample.closest('[data-fb-nested]') : null;
+                    if (nestedEl) targetDepth = parseInt(nestedEl.dataset.fbDepth, 10) || 0;
+                }
+                if (wouldExceedRepeaterDepth(clipboard, targetDepth)) {
+                    alert('Mehr als ' + (MAX_REPEATER_DEPTH + 1) + ' Repeater-Ebenen werden nicht unterstuetzt.');
+                    return;
+                }
+                var cloneP = deepCloneWithNewIds(clipboard);
+                posP.list.splice(posP.index + 1, 0, cloneP);
+                renderCanvas();
+                emitCode();
+                selectItem(cloneP);
+                return;
+            }
+        });
+
+        function renderCanvas() {
+            // Destroy any existing nested Sortable instances before wiping the DOM.
+            // Otherwise their internal state can re-insert stale clones on subsequent drags.
+            $canvas.querySelectorAll('[data-fb-nested]').forEach(function (el) {
+                var s = (typeof Sortable !== 'undefined' && Sortable.get) ? Sortable.get(el) : null;
+                if (s) { try { s.destroy(); } catch (e) {} }
+            });
+            $canvas.innerHTML = '';
+            if (state.length === 0) {
+                $canvas.innerHTML = '<p class="mform-fb__hint">Felder hierher ziehen oder links anklicken</p>';
+                highlightActive();
+                return;
+            }
+            state.forEach(function (item) {
+                $canvas.appendChild(renderItem(item, 0));
+            });
+            highlightActive();
+        }
+
+        function highlightActive() {
+            $canvas.querySelectorAll('.mform-fb__item.is-active').forEach(function (el) { el.classList.remove('is-active'); });
+            if (!activeItem) return;
+            var els = $canvas.querySelectorAll('[data-uid="' + activeItem.uid + '"]');
+            els.forEach(function (el) { el.classList.add('is-active'); });
+        }
+
+        // ---- Props panel ----------------------------------------------------
+
+        function selectItem(item) {
+            activeItem = item;
+            renderProps();
+            highlightActive();
+        }
+
+        function renderProps() {
+            if (!activeItem) {
+                $propsEmpty.style.display = '';
+                $propsForm.style.display = 'none';
+                return;
+            }
+            $propsEmpty.style.display = 'none';
+            $propsForm.style.display = '';
+
+            var def = TYPES[activeItem.type];
+            var available = (def.props || []).slice();
+            if (supportsVisibility(activeItem.type)) {
+                Array.prototype.push.apply(available, VISIBILITY_PROPS);
+            }
+            // Weitere Attribute fuer alle echten Felder (nicht fuer Wrapper und reine Struktur-Elemente)
+            if (isConditionSourceType(activeItem.type) && available.indexOf('customAttrs') === -1) {
+                available.push('customAttrs');
+            }
+
+            $propsForm.querySelectorAll('[data-fb-prop-group]').forEach(function (g) {
+                g.style.display = available.indexOf(g.dataset.fbPropGroup) !== -1 ? '' : 'none';
+            });
+
+            // Editor-Profil nur sichtbar, wenn ein Editor gewaehlt ist
+            var profileGroup = $propsForm.querySelector('[data-fb-prop-group="editorProfile"]');
+            if (profileGroup && !activeItem.editor) {
+                profileGroup.style.display = 'none';
+            }
+
+            $propsForm.querySelectorAll('[data-fb-prop]').forEach(function (input) {
+                var key = input.dataset.fbProp;
+                var val = activeItem[key];
+                if (input.type === 'checkbox') input.checked = !!val;
+                else input.value = val == null ? '' : val;
+            });
+
+            renderVisibilityConditions();
+        }
+
+        function collectConditionSourceOptions(list, nested, options, excludeUid) {
+            var names = computeNames(state).byUid;
+
+            (list || []).forEach(function (item) {
+                var entry = names[item.uid];
+                if (item.uid !== excludeUid && isConditionSourceType(item.type) && entry) {
+                    options.push({
+                        uid: item.uid,
+                        label: item.label || item.type,
+                        type: item.type,
+                        ref: entry.kind === 'slot' ? String(entry.n) : entry.key
+                    });
+                }
+
+                if (Array.isArray(item.children) && item.children.length) {
+                    collectConditionSourceOptions(item.children, true, options, excludeUid);
+                }
+            });
+        }
+
+        function newCondition() {
+            return { sourceUid: '', operator: 'eq', value: '' };
+        }
+
+        // Bedingungs-Editor (#417): je Zeile Quellfeld, Operator, Vergleichswert; Verknuepfung alle/eine.
+        function renderVisibilityConditions() {
+            var group = $propsForm.querySelector('[data-fb-prop-group="visibilityConditions"]');
+            if (!group || !activeItem) return;
+            var enabled = !!activeItem.visibilityEnabled && supportsVisibility(activeItem.type);
+            group.style.display = enabled ? '' : 'none';
+            var host = group.querySelector('[data-fb-conditions]');
+            var logicSelect = group.querySelector('[data-fb-cond-logic]');
+            if (!host) return;
+            host.innerHTML = '';
+            if (!enabled) return;
+
+            var sources = [];
+            collectConditionSourceOptions(state, false, sources, activeItem.uid);
+            if (!Array.isArray(activeItem.visibilityConditions)) activeItem.visibilityConditions = [];
+            var conditions = activeItem.visibilityConditions;
+            conditions.forEach(function (c) {
+                if (c.sourceUid && !sources.some(function (s) { return s.uid === c.sourceUid; })) c.sourceUid = '';
+            });
+
+            conditions.forEach(function (c, index) {
+                if (index > 0) {
+                    var glue = document.createElement('div');
+                    glue.className = 'mform-fb__cond-glue';
+                    glue.textContent = activeItem.visibilityLogic === 'any' ? 'oder' : 'und';
+                    host.appendChild(glue);
+                }
+                var row = document.createElement('div');
+                row.className = 'mform-fb__cond';
+                row.dataset.fbCondIndex = String(index);
+
+                var source = document.createElement('select');
+                source.className = 'form-control input-sm mform-fb__cond-source';
+                source.dataset.fbCondKey = 'sourceUid';
+                source.appendChild(new Option('Quellfeld waehlen', ''));
+                sources.forEach(function (s) { source.appendChild(new Option(s.label + ' [' + s.type + ': ' + s.ref + ']', s.uid)); });
+                source.value = c.sourceUid;
+
+                var operator = document.createElement('select');
+                operator.className = 'form-control input-sm mform-fb__cond-op';
+                operator.dataset.fbCondKey = 'operator';
+                CONDITION_OPERATORS.forEach(function (o) { operator.appendChild(new Option(o[1], o[0])); });
+                operator.value = c.operator;
+
+                var value = document.createElement('input');
+                value.type = 'text';
+                value.className = 'form-control input-sm mform-fb__cond-value';
+                value.dataset.fbCondKey = 'value';
+                value.placeholder = c.operator === 'in' ? 'a,b,c' : 'Vergleichswert';
+                value.value = c.value;
+                if (c.operator === 'empty' || c.operator === 'not_empty') value.style.display = 'none';
+
+                var remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'btn btn-default btn-xs mform-fb__cond-remove';
+                remove.dataset.fbCondRemove = '1';
+                remove.title = 'Bedingung entfernen';
+                remove.innerHTML = '<i class="rex-icon fa-times"></i>';
+
+                row.appendChild(source);
+                row.appendChild(operator);
+                row.appendChild(value);
+                row.appendChild(remove);
+                host.appendChild(row);
+            });
+
+            if (logicSelect) {
+                logicSelect.value = activeItem.visibilityLogic === 'any' ? 'any' : 'all';
+                logicSelect.style.display = conditions.length > 1 ? '' : 'none';
+            }
+        }
+
+        function onConditionEvent(e) {
+            if (!activeItem) return;
+            var logic = e.target.closest('[data-fb-cond-logic]');
+            if (logic) {
+                activeItem.visibilityLogic = logic.value === 'any' ? 'any' : 'all';
+                renderVisibilityConditions();
+                emitCode();
+                return;
+            }
+            var field = e.target.closest('[data-fb-cond-key]');
+            if (!field) return;
+            var row = field.closest('[data-fb-cond-index]');
+            var condition = row ? activeItem.visibilityConditions[parseInt(row.dataset.fbCondIndex, 10)] : null;
+            if (!condition) return;
+            condition[field.dataset.fbCondKey] = field.value;
+            if (field.dataset.fbCondKey === 'operator') renderVisibilityConditions();
+            emitCode();
+        }
+
+        $propsForm.addEventListener('input', onConditionEvent);
+        $propsForm.addEventListener('change', onConditionEvent);
+        $propsForm.addEventListener('click', function (e) {
+            if (!activeItem) return;
+            if (e.target.closest('[data-fb-cond-add]')) {
+                e.preventDefault();
+                activeItem.visibilityConditions.push(newCondition());
+                renderVisibilityConditions();
+                return;
+            }
+            var remove = e.target.closest('[data-fb-cond-remove]');
+            if (remove) {
+                e.preventDefault();
+                var row = remove.closest('[data-fb-cond-index]');
+                activeItem.visibilityConditions.splice(parseInt(row.dataset.fbCondIndex, 10), 1);
+                renderVisibilityConditions();
+                emitCode();
+            }
+        });
+
+        $propsForm.addEventListener('input', function (e) {
+            if (!activeItem) return;
+            var input = e.target.closest('[data-fb-prop]');
+            if (!input) return;
+            var key = input.dataset.fbProp;
+            activeItem[key] = input.type === 'checkbox' ? input.checked : input.value;
+            if (key === 'editor') {
+                renderProps();
+            }
+            if (key === 'columnSize') {
+                renderCanvas();
+            }
+            if (key === 'visibilityEnabled') {
+                if (activeItem.visibilityEnabled && !(activeItem.visibilityConditions || []).length) {
+                    activeItem.visibilityConditions = [newCondition()];
+                }
+                renderProps();
+            }
+            if (key === 'label') {
+                $canvas.querySelectorAll('[data-uid="' + activeItem.uid + '"] > .mform-fb__item-head .mform-fb__item-label').forEach(function (lbl) {
+                    lbl.textContent = activeItem.label || activeItem.type;
+                });
+                renderProps();
+            }
+            emitCode();
+        });
+
+        $propsForm.addEventListener('click', function (e) {
+            var btn = e.target.closest('[data-fb-action="colorswatch-example"]');
+            if (!btn || !activeItem || activeItem.type !== 'colorswatch') return;
+            activeItem.options = '#ffffff=Weiss\n#111111=Schwarz\n#2f77bc=Blau\n#e74c3c=Rot\n#27ae60=Gruen\n.text-primary=Primaer CSS|#2f77bc\n.text-muted=Gedaempft CSS|#6c757d';
+            var optionsInput = $propsForm.querySelector('[data-fb-prop="options"]');
+            if (optionsInput) optionsInput.value = activeItem.options;
+            emitCode();
+        });
+
+        var TYPE_SEARCH_ALIASES = {
+            colorswatch: 'color swatch farbe palette css preview',
+            number: 'zahl nummer numerisch min max step html5',
+            range: 'slider schieberegler bereich html5',
+            date: 'datum kalender html5',
+            datetime: 'datum uhrzeit datetime-local html5',
+            time: 'uhrzeit zeit html5',
+            email: 'e-mail mail adresse html5',
+            color: 'farbe colorpicker nativ html5',
+            togglecheckbox: 'toggle switch umschalter',
+            customlink: 'url link intern extern mailto tel',
+            customlinkmultiple: 'url links mehrere intern extern mailto tel',
+            alertinfo: 'info hinweis nachricht',
+            alertwarning: 'warning warnung',
+            alertdanger: 'danger fehler',
+            alertsuccess: 'success erfolg',
+            repeater: 'repeat wiederholung liste',
+            fieldset: 'gruppe bereich',
+            tab: 'tabs reiter',
+            modal: 'dialog popup',
+            collapse: 'auf zu klappen einklappen toggle',
+            accordion: 'akkordeon collapse gruppe',
+            column: 'spalte spalten grid bootstrap row col',
+            inline: 'inline nebeneinander zeile',
+            textreadonly: 'readonly nur lesen text',
+            textareareadonly: 'readonly nur lesen textarea',
+            radioimg: 'radio bild image layout vorschau',
+            radioicon: 'radio icon fontawesome',
+            radiocolor: 'radio farbe color'
+        };
+
+        function paletteSearchText(li) {
+            var label = (li.textContent || '').toLowerCase();
+            var type = String(li.dataset.type || '').toLowerCase();
+            var aliases = TYPE_SEARCH_ALIASES[type] || '';
+            return label + ' ' + type + ' ' + aliases;
+        }
+
+        function applyPaletteFilter(term) {
+            var q = String(term || '').trim().toLowerCase();
+            var visibleCount = 0;
+
+            [$palette, $paletteWrap].forEach(function (listEl) {
+                if (!listEl) return;
+                listEl.querySelectorAll('.mform-fb__pal-item').forEach(function (li) {
+                    var show = q === '' || paletteSearchText(li).indexOf(q) !== -1;
+                    li.style.display = show ? '' : 'none';
+                    if (show) visibleCount++;
+                });
+            });
+
+            if ($paletteEmpty) {
+                $paletteEmpty.style.display = visibleCount === 0 ? '' : 'none';
+            }
+        }
+
+        if ($paletteSearch) {
+            $paletteSearch.addEventListener('input', function () {
+                applyPaletteFilter($paletteSearch.value);
+            });
+
+            document.addEventListener('keydown', function (e) {
+                if (e.key === '/' && document.activeElement !== $paletteSearch) {
+                    e.preventDefault();
+                    $paletteSearch.focus();
+                    $paletteSearch.select();
+                }
+            });
+        }
+
+        applyPaletteFilter('');
+
+        // ---- Sortable wiring ------------------------------------------------
+
+        function listFor(el) {
+            if (el === $canvas) return state;
+            if (el && el.dataset && el.dataset.fbNested) {
+                var owner = findItem(el.dataset.fbNested);
+                return owner && owner.children ? owner.children : null;
+            }
+            return null;
+        }
+
+        function depthOf(el) {
+            return parseInt((el && el.dataset && el.dataset.fbDepth) || '0', 10);
+        }
+
+        function handleSortAdd(evt) {
+            var fromPalette = evt.from === $palette || evt.from === $paletteWrap;
+            var toList = listFor(evt.to);
+            // Always defer: let Sortable finish its DOM mutations, then re-render from state.
+            var doRender = function () { renderCanvas(); emitCode(); };
+
+            if (!toList) {
+                if (evt.item.parentNode) evt.item.parentNode.removeChild(evt.item);
+                setTimeout(doRender, 0);
+                return;
+            }
+
+            if (fromPalette) {
+                var type = evt.item.dataset.type;
+                if (evt.item.parentNode) evt.item.parentNode.removeChild(evt.item);
+                if (!type) { setTimeout(doRender, 0); return; }
+                if (type === 'repeater' && depthOf(evt.to) > MAX_REPEATER_DEPTH) {
+                    alert('Mehr als ' + (MAX_REPEATER_DEPTH + 1) + ' Repeater-Ebenen werden nicht unterstuetzt.');
+                    setTimeout(doRender, 0);
+                    return;
+                }
+                // New item from palette has no children, so subtree depth is 0; depthOf check above
+                // is sufficient for palette inserts.
+                var newItem = makeItem(type);
+                toList.splice(evt.newIndex, 0, newItem);
+                setTimeout(function () { doRender(); selectItem(newItem); }, 0);
+                return;
+            }
+
+            // Cross-list move within builder
+            var uid = evt.item.dataset && evt.item.dataset.uid;
+            if (!uid) { setTimeout(doRender, 0); return; }
+            var item = findItem(uid);
+            if (!item) { setTimeout(doRender, 0); return; }
+
+            // For an EXISTING repeater being moved, also account for its own subtree depth.
+            if (item.type === 'repeater' && wouldExceedRepeaterDepth(item, depthOf(evt.to))) {
+                alert('Mehr als ' + (MAX_REPEATER_DEPTH + 1) + ' Repeater-Ebenen werden nicht unterstuetzt.');
+                setTimeout(doRender, 0);
+                return;
+            }
+            removeItem(uid);
+            toList.splice(evt.newIndex, 0, item);
+            setTimeout(doRender, 0);
+        }
+
+        // Safety net: if Sortable removes an item from a list and onAdd never fires
+        // on a known destination (e.g. dropped outside any drop zone), the state is
+        // still intact but the DOM lost the node. A deferred renderCanvas heals this.
+        function handleSortRemove() {
+            setTimeout(function () { renderCanvas(); }, 0);
+        }
+
+        function handleSortUpdate(evt) {
+            var list = listFor(evt.from);
+            if (!list) return;
+            if (evt.oldIndex === evt.newIndex) return;
+            var moved = list.splice(evt.oldIndex, 1)[0];
+            list.splice(evt.newIndex, 0, moved);
+            setTimeout(function () { renderCanvas(); emitCode(); }, 0);
+        }
+
+        // Palette: clone-on-drag + click-to-add. Both work side by side.
+        Sortable.create($palette, {
+            group: { name: 'fb-palette', pull: 'clone', put: false },
+            sort: false,
+            animation: 0
+        });
+        Sortable.create($paletteWrap, {
+            group: { name: 'fb-palette', pull: 'clone', put: false },
+            sort: false,
+            animation: 0
+        });
+
+        function paletteClick(e) {
+            // Ignore if it was the end of a drag
+            if (e.detail === 0) return;
+            var li = e.target.closest('.mform-fb__pal-item');
+            if (!li) return;
+            // Only react if the li is inside one of the palette containers
+            if (!$palette.contains(li) && !$paletteWrap.contains(li)) return;
+            var type = li.dataset.type;
+            if (!type) return;
+            // Vorlagen: mehrere Spalten auf einmal (6+6, 4+4+4)
+            var presetSizes = li.dataset.preset ? String(li.dataset.preset).split('+').map(function (n) { return parseInt(n, 10); }).filter(function (n) { return n > 0; }) : [];
+            var newItems = presetSizes.length
+                ? presetSizes.map(function (size) { var col = makeItem('column'); col.columnSize = String(size); return col; })
+                : [makeItem(type)];
+            var newItem = newItems[0];
+
+            // If an active repeater/tab/fieldset is selected, attempt to insert as child.
+            // Otherwise append at top level.
+            var canNestInto = activeItem && isContainerType(activeItem.type);
+            if (canNestInto) {
+                // Determine builder-depth of the active container's children list.
+                var nestedEl = $canvas.querySelector('[data-fb-nested="' + activeItem.uid + '"]');
+                var childDepth = nestedEl ? (parseInt(nestedEl.dataset.fbDepth, 10) || 0) : 1;
+                if (type === 'repeater' && childDepth > MAX_REPEATER_DEPTH) {
+                    alert('Mehr als ' + (MAX_REPEATER_DEPTH + 1) + ' Repeater-Ebenen werden nicht unterstuetzt.');
+                    return;
+                }
+                Array.prototype.push.apply(activeItem.children, newItems);
+            } else {
+                Array.prototype.push.apply(state, newItems);
+            }
+            renderCanvas();
+            emitCode();
+            selectItem(newItem);
+        }
+        $palette.addEventListener('click', paletteClick);
+        $paletteWrap.addEventListener('click', paletteClick);
+
+        Sortable.create($canvas, {
+            group: { name: 'fb-fields', pull: true, put: ['fb-palette', 'fb-fields'] },
+            animation: 150,
+            handle: '.mform-fb__item-handle',
+            onUpdate: handleSortUpdate,
+            onAdd: handleSortAdd,
+            onRemove: handleSortRemove
+        });
+
+        // ---- Toolbar --------------------------------------------------------
+
+        document.querySelector('[data-fb-action="clear"]').addEventListener('click', function () {
+            if (!confirm('Alles loeschen?')) return;
+            state = [];
+            nextId = 1;
+            activeItem = null;
+            clearPersistedBuilderState();
+            renderProps();
+            renderCanvas();
+            emitCode();
+        });
+
+        function showCopyMessage(msgEl, label, ttl) {
+            if (!msgEl) return;
+            msgEl.textContent = label;
+            setTimeout(function () { msgEl.textContent = ''; }, ttl || 1500);
+        }
+
+        function copyToClipboard(text, msgEl) {
+            if (!mformUi || typeof mformUi.copyTextToClipboard !== 'function') {
+                showCopyMessage(msgEl, 'Kopieren nicht verfuegbar', 2500);
+                return;
+            }
+
+            mformUi.copyTextToClipboard(text).then(function () {
+                showCopyMessage(msgEl, 'kopiert', 1500);
+            }).catch(function () {
+                showCopyMessage(msgEl, 'Kopieren fehlgeschlagen', 2500);
+            });
+        }
+
+        function setCodeText(target, value) {
+            if (mformUi && typeof mformUi.setCodeText === 'function') {
+                mformUi.setCodeText(target, value);
+                return;
+            }
+
+            target.value = value;
+        }
+
+        function getCodeText(target) {
+            if (mformUi && typeof mformUi.getCodeText === 'function') {
+                return mformUi.getCodeText(target);
+            }
+
+            return target.value || '';
+        }
+
+        function initCodeViewers() {
+            if (!mformUi || typeof mformUi.enhanceReadonlyCode !== 'function') {
+                return;
+            }
+
+            mformUi.enhanceReadonlyCode($code, {
+                containerClass: 'mform-fb__code-viewer',
+                minHeight: 240,
+                language: 'php'
+            });
+            mformUi.enhanceReadonlyCode($output, {
+                containerClass: 'mform-fb__code-viewer',
+                minHeight: 240,
+                language: 'php'
+            });
+        }
+
+        // ---- Export / Import (#406) --------------------------------------------
+        var BUILDER_STATE_VERSION = 2; // 2: Sichtbarkeit als Liste von Bedingungen (visibilityConditions, visibilityLogic)
+        var $stateMsg = document.querySelector('[data-fb-state-msg]');
+
+        function migrateBuilderState(payload) {
+            // Alte localStorage-Form { state: [...] } akzeptieren.
+            if (payload && Array.isArray(payload.state) && !payload.fields) {
+                payload = { mformBuilderVersion: 1, fields: payload.state };
+            }
+            if (!payload || typeof payload !== 'object') throw new Error('Keine Builder-Datei.');
+            var version = parseInt(payload.mformBuilderVersion, 10);
+            if (!version) throw new Error('Versionsmarker mformBuilderVersion fehlt.');
+            if (version > BUILDER_STATE_VERSION) throw new Error('Datei stammt aus einer neueren MForm-Version (' + version + ').');
+            // Migrations-Hook: kuenftige Formatwechsel hier je Version anheben.
+            while (version < BUILDER_STATE_VERSION) {
+                version++;
+            }
+            if (!Array.isArray(payload.fields)) throw new Error('Feldliste fehlt.');
+            return payload;
+        }
+
+        function exportBuilderState() {
+            var payload = { mformBuilderVersion: BUILDER_STATE_VERSION, exportedAt: new Date().toISOString(), fields: state };
+            var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'mform-builder.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+            showCopyMessage($stateMsg, 'Exportiert', 2000);
+        }
+
+        function importBuilderState(text) {
+            var payload = migrateBuilderState(JSON.parse(text));
+            var fields = payload.fields.map(sanitizeItem).filter(function (i) { return i !== null; });
+            if (state.length && !confirm('Aktuellen Builder-Stand durch die importierte Datei ersetzen?')) return;
+            state = fields;
+            nextId = collectMaxIdFromState(state) + 1;
+            activeItem = null;
+            renderProps();
+            renderCanvas();
+            emitCode();
+            persistBuilderState();
+            showCopyMessage($stateMsg, fields.length + ' Feld(er) importiert', 2500);
+        }
+
+        var $exportBtn = document.querySelector('[data-fb-action="export"]');
+        var $importBtn = document.querySelector('[data-fb-action="import"]');
+        var $importFile = document.querySelector('[data-fb-import-file]');
+        if ($exportBtn) $exportBtn.addEventListener('click', function (e) { e.preventDefault(); exportBuilderState(); });
+        if ($importBtn && $importFile) {
+            $importBtn.addEventListener('click', function (e) { e.preventDefault(); $importFile.value = ''; $importFile.click(); });
+            $importFile.addEventListener('change', function () {
+                var file = $importFile.files && $importFile.files[0];
+                if (!file) return;
+                var reader = new FileReader();
+                reader.onload = function () {
+                    try { importBuilderState(String(reader.result || '')); }
+                    catch (err) { alert('Import fehlgeschlagen: ' + err.message); }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        // ---- Live-Vorschau (#407) ---------------------------------------------
+        var $previewBar = document.querySelector('[data-fb-preview-bar]');
+        var $preview = document.querySelector('[data-fb-preview]');
+        var $previewAuto = document.querySelector('[data-fb-preview-auto]');
+        var $previewMsg = document.querySelector('[data-fb-preview-msg]');
+        var previewTimer = null;
+        var previewRequest = null;
+
+        function previewTheme() {
+            if (document.body.classList.contains('rex-theme-dark')) return 'dark';
+            if (document.body.classList.contains('rex-theme-light')) return 'light';
+            return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+
+        function refreshPreview() {
+            if (!$preview || !$previewBar) return;
+            var code = getCodeText($code);
+            if (previewRequest) previewRequest.abort();
+            if ($previewMsg) $previewMsg.textContent = 'Rendere …';
+            var body = new URLSearchParams();
+            body.set('code', code);
+            body.set('theme', previewTheme());
+            body.set('_csrf_token', $previewBar.dataset.fbPreviewCsrf || '');
+            previewRequest = new XMLHttpRequest();
+            previewRequest.open('POST', $previewBar.dataset.fbPreviewUrl, true);
+            previewRequest.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+            previewRequest.onload = function () {
+                previewRequest = null;
+                if (this.status !== 200) {
+                    if ($previewMsg) $previewMsg.textContent = 'Vorschau fehlgeschlagen (' + this.status + ')';
+                    return;
+                }
+                $preview.srcdoc = this.responseText;
+                if ($previewMsg) $previewMsg.textContent = '';
+            };
+            previewRequest.onerror = function () { previewRequest = null; if ($previewMsg) $previewMsg.textContent = 'Vorschau fehlgeschlagen'; };
+            previewRequest.send(body.toString());
+        }
+
+        function schedulePreview() {
+            if (!$previewAuto || !$previewAuto.checked) return;
+            clearTimeout(previewTimer);
+            previewTimer = setTimeout(refreshPreview, 800);
+        }
+
+        // Hoehe nur uebernehmen, solange der Vorschau-Reiter sichtbar ist (versteckter Iframe misst 0).
+        var lastPreviewHeight = 0;
+        function previewPaneHidden() {
+            var pane = $preview ? $preview.closest('[data-fb-section-body]') : null;
+            return !!(pane && pane.hidden);
+        }
+        window.addEventListener('message', function (e) {
+            if (!$preview || !e.data || typeof e.data.mformBuilderPreviewHeight !== 'number') return;
+            if (previewPaneHidden()) return;
+            lastPreviewHeight = Math.max(160, Math.min(e.data.mformBuilderPreviewHeight + 24, 4000));
+            $preview.style.height = lastPreviewHeight + 'px';
+        });
+        var $previewBtn = document.querySelector('[data-fb-action="preview"]');
+        if ($previewBtn) $previewBtn.addEventListener('click', refreshPreview);
+        if ($previewAuto) $previewAuto.addEventListener('change', function () { if ($previewAuto.checked) refreshPreview(); });
+
+        // Abschnitte Vorschau / Eingabe / Ausgabe: unabhaengig auf- und zuklappbar, Vorschau
+        // standardmaessig offen; die offenen Abschnitte werden im Browser gemerkt.
+        var SECTIONS_STORAGE_KEY = 'mform.formbuilder.sections';
+        var $sections = document.querySelector('[data-fb-sections]');
+        function sectionOpen(section) {
+            var body = section.querySelector('[data-fb-section-body]');
+            return !!(body && !body.hidden);
+        }
+        function setSectionOpen(section, open) {
+            var body = section.querySelector('[data-fb-section-body]');
+            var toggle = section.querySelector('[data-fb-section-toggle]');
+            if (!body) return;
+            body.hidden = !open;
+            section.classList.toggle('is-open', open);
+            if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open && section.dataset.fbSection === 'preview' && $preview) {
+                if (lastPreviewHeight) $preview.style.height = lastPreviewHeight + 'px';
+                if ($preview.contentWindow) {
+                    try { $preview.contentWindow.postMessage({ mformBuilderMeasure: true }, '*'); } catch (_e) { /* noop */ }
+                }
+                if (!$preview.srcdoc && state.length) refreshPreview();
+            }
+        }
+        function updateSectionsToggle() {
+            if (!$sections) return;
+            var all = Array.prototype.slice.call($sections.querySelectorAll('[data-fb-section]'));
+            var allOpen = all.every(sectionOpen);
+            var btn = $sections.querySelector('[data-fb-sections-toggle] i');
+            if (btn) {
+                btn.classList.toggle('fa-window-minimize', allOpen);
+                btn.classList.toggle('fa-window-maximize', !allOpen);
+            }
+        }
+        function rememberSections() {
+            if (!$sections) return;
+            var open = Array.prototype.slice.call($sections.querySelectorAll('[data-fb-section]')).filter(sectionOpen).map(function (s) { return s.dataset.fbSection; });
+            try { window.localStorage.setItem(SECTIONS_STORAGE_KEY, JSON.stringify(open)); } catch (_e) { /* noop */ }
+            updateSectionsToggle();
+        }
+        if ($sections) {
+            var storedOpen = null;
+            try { storedOpen = JSON.parse(window.localStorage.getItem(SECTIONS_STORAGE_KEY) || 'null'); } catch (_e) { storedOpen = null; }
+            if (!Array.isArray(storedOpen)) storedOpen = ['preview'];
+            $sections.querySelectorAll('[data-fb-section]').forEach(function (section) {
+                setSectionOpen(section, storedOpen.indexOf(section.dataset.fbSection) !== -1);
+            });
+            updateSectionsToggle();
+            $sections.addEventListener('click', function (e) {
+                var toggleAll = e.target.closest('[data-fb-sections-toggle]');
+                if (toggleAll) {
+                    e.preventDefault();
+                    var all = Array.prototype.slice.call($sections.querySelectorAll('[data-fb-section]'));
+                    var open = !all.every(sectionOpen);
+                    all.forEach(function (section) { setSectionOpen(section, open); });
+                    rememberSections();
+                    return;
+                }
+                var toggle = e.target.closest('[data-fb-section-toggle]');
+                if (!toggle) return;
+                e.preventDefault();
+                var section = toggle.closest('[data-fb-section]');
+                setSectionOpen(section, !sectionOpen(section));
+                rememberSections();
+            });
+        }
+
+        // Copy-Buttons gibt es mehrfach (Leiste und Eingabe-Abschnitt); Meldung neben dem geklickten Button.
+        document.querySelectorAll('[data-fb-action="copy"]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                copyToClipboard(getCodeText($code), btn.parentElement.querySelector('[data-fb-copy-msg]'));
+            });
+        });
+
+        document.querySelectorAll('[data-fb-action="copy-output"]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                copyToClipboard(getCodeText($output), btn.parentElement.querySelector('[data-fb-copy-output-msg]'));
+            });
+        });
+
+        // ---- Code generation ------------------------------------------------
+
+        function phpStr(s) {
+            // PHP single-quoted strings: only \\ and \' are interpreted as escapes.
+            // Newlines or carriage returns inside a literal would still be valid but
+            // produce ugly multi-line code; we keep them as actual line breaks for
+            // strings without quotes/backslashes, but switch to double-quoted when
+            // the input contains \n or \r so the generated PHP stays single-line.
+            var str = String(s);
+            if (/[\r\n]/.test(str)) {
+                // Use double quotes with proper escaping.
+                return '"' + str
+                    .replace(/\\/g, '\\\\')
+                    .replace(/"/g, '\\"')
+                    .replace(/\$/g, '\\$')
+                    .replace(/\r/g, '\\r')
+                    .replace(/\n/g, '\\n') + '"';
+            }
+            return "'" + str.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+        }
+
+        function parseOptions(raw) {
+            if (!raw) return [];
+            return raw.split('\n').map(function (line) { return line.trim(); }).filter(Boolean).map(function (line, idx) {
+                var eq = line.indexOf('=');
+                if (eq === -1) return { key: idx + 1, label: line };
+                return { key: line.slice(0, eq).trim(), label: line.slice(eq + 1).trim() };
+            });
+        }
+
+        function parseColorSwatches(raw) {
+            if (!raw) return [];
+            return raw.split('\n').map(function (line) { return line.trim(); }).filter(Boolean).map(function (line, idx) {
+                var eq = line.indexOf('=');
+                if (eq === -1) {
+                    return { key: String(line), label: String(line), preview: null };
+                }
+                var key = line.slice(0, eq).trim();
+                var rest = line.slice(eq + 1).trim();
+                var pipe = rest.indexOf('|');
+                if (pipe === -1) {
+                    return { key: key || String(idx + 1), label: rest || key || String(idx + 1), preview: null };
+                }
+                var label = rest.slice(0, pipe).trim();
+                var preview = rest.slice(pipe + 1).trim();
+                return {
+                    key: key || String(idx + 1),
+                    label: label || key || String(idx + 1),
+                    preview: preview || null
+                };
+            });
+        }
+
+        function optionsArray(items) {
+            var pairs = items.map(function (o) {
+                var k = /^\d+$/.test(String(o.key)) ? String(o.key) : phpStr(o.key);
+                return k + ' => ' + phpStr(o.label);
+            });
+            return '[' + pairs.join(', ') + ']';
+        }
+
+        function colorSwatchArray(items) {
+            var pairs = items.map(function (o) {
+                var k = /^\d+$/.test(String(o.key)) ? String(o.key) : phpStr(o.key);
+                if (o.preview) {
+                    return k + ' => [' + phpStr('label') + ' => ' + phpStr(o.label) + ', ' + phpStr('preview') + ' => ' + phpStr(o.preview) + ']';
+                }
+                return k + ' => ' + phpStr(o.label);
+            });
+            return '[' + pairs.join(', ') + ']';
+        }
+
+        function slugify(s, fallback) {
+            if (!s) return fallback;
+            var slug = String(s).toLowerCase()
+                .replace(/[\u00e4]/g, 'ae').replace(/[\u00f6]/g, 'oe').replace(/[\u00fc]/g, 'ue').replace(/[\u00df]/g, 'ss')
+                .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+            return slug || fallback;
+        }
+
+        function attrsForItem(item) {
+            var a = {};
+            if (item.label && item.type !== 'hidden') a.label = item.label;
+            if (item.placeholder) a.placeholder = item.placeholder;
+            if (item.required) a.required = 'required';
+            if (item.notice) a.notice = item.notice;
+            if (item.rows && item.type === 'textarea') a.rows = item.rows;
+            // HTML5-Felder: min/max/step nur, wenn gesetzt
+            if (['number', 'range', 'date', 'datetime', 'time'].indexOf(item.type) !== -1) {
+                if (item.inputMin !== '' && item.inputMin != null) a.min = item.inputMin;
+                if (item.inputMax !== '' && item.inputMax != null) a.max = item.inputMax;
+                if (item.inputStep !== '' && item.inputStep != null) a.step = item.inputStep;
+            }
+            if (item.btnAdd && item.type === 'customlinkmultiple') a.btn_add = item.btnAdd;
+
+            // Tags: allow_new / max
+            if (item.type === 'tags') {
+                if (item.tagsAllowNew === false) a.allow_new = false;
+                var tagsMax = parseInt(item.tagsMax, 10);
+                if (tagsMax > 0) a.max = tagsMax;
+            }
+            // CheckboxGroup: layout / mode / default-value laut docs/12_checkbox_group.md
+            if (item.type === 'checkboxgroup') {
+                if (item.cbgLayout && item.cbgLayout !== 'horizontal') a.layout = item.cbgLayout;
+                if (item.cbgMode && item.cbgMode !== 'checkbox') a.mode = item.cbgMode;
+                if (item.defaultValue) a['default-value'] = item.defaultValue;
+            }
+
+            // CSS class merge: Editor-Klasse + eigene Klassen (+ class aus "Weitere Attribute")
+            var classes = [];
+            var editorClasses = { tinymce: ['form-control', 'tiny-editor'], cke5: ['cke5-editor'], markdown: ['markdowneditor-editor'] };
+            if (item.type === 'textarea' && editorClasses[item.editor]) {
+                Array.prototype.push.apply(classes, editorClasses[item.editor]);
+            }
+            if (item.cssClass) classes.push(item.cssClass);
+
+            // Editor-Profil
+            if (item.type === 'textarea' && item.editor && item.editorProfile) {
+                a[item.editor === 'markdown' ? 'data-markdowneditor-profile' : 'data-profile'] = item.editorProfile;
+            }
+
+            // Weitere Attribute: eine je Zeile, name=wert (ohne "=" -> name=name, z. B. required)
+            parseCustomAttrs(item.customAttrs).forEach(function (pair) {
+                if (pair.key === 'class') {
+                    classes.push(pair.value);
+                    return;
+                }
+                a[pair.key] = pair.value;
+            });
+            if (classes.length) a['class'] = classes.join(' ');
+
+            // CustomLink data-* toggles
+            if (item.type === 'customlink' || item.type === 'customlinkmultiple') {
+                a['data-intern'] = item.clTypeIntern ? 'enable' : 'disable';
+                a['data-extern'] = item.clTypeExtern ? 'enable' : 'disable';
+                a['data-media']  = item.clTypeMedia  ? 'enable' : 'disable';
+                a['data-mailto'] = item.clTypeMailto ? 'enable' : 'disable';
+                a['data-tel']    = item.clTypeTel    ? 'enable' : 'disable';
+                if (item.linkCategory)  a['data-link-category']  = item.linkCategory;
+                if (item.mediaCategory) a['data-media-category'] = item.mediaCategory;
+                if (item.externPrefix)  a['data-extern-link-prefix'] = item.externPrefix;
+                if (item.mediaType)     a['data-media-type'] = item.mediaType;
+            } else if ((item.type === 'media' || item.type === 'medialist') && item.mediaType) {
+                a['data-media-type'] = item.mediaType;
+            }
+            // A11y-Metadaten-Pruefung (docs/16_a11y.md): ALT-Text im Medienpool
+            if (item.a11yAlt && ['media', 'medialist', 'imagelist', 'customlink', 'customlinkmultiple'].indexOf(item.type) !== -1) {
+                a.a11y = ['med_alt'];
+            }
+            return a;
+        }
+
+        function phpValue(v) {
+            if (Array.isArray(v)) return '[' + v.map(phpValue).join(', ') + ']';
+            if (v === true || v === false) return v ? 'true' : 'false';
+            if (typeof v === 'number') return String(v);
+            return phpStr(v);
+        }
+
+        // Weitere Attribute: "name=wert" je Zeile; ohne "=" wird name=name (z. B. required)
+        function parseCustomAttrs(raw) {
+            var out = [];
+            String(raw || '').split('\n').forEach(function (line) {
+                line = line.trim();
+                if (!line) return;
+                var eq = line.indexOf('=');
+                var key = (eq === -1 ? line : line.slice(0, eq)).trim();
+                if (!/^[a-zA-Z_:][\w:.-]*$/.test(key)) return;
+                out.push({ key: key, value: eq === -1 ? key : line.slice(eq + 1).trim() });
+            });
+            return out;
+        }
+
+        // Tags: eine Zeile je Vorschlag (ohne key=), leere Zeilen ignorieren
+        function parseSuggestions(raw) {
+            return String(raw || '').split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+        }
+
+        function attrsToPhp(attrs) {
+            var keys = Object.keys(attrs);
+            if (!keys.length) return null;
+            return '[' + keys.map(function (k) { return phpStr(k) + ' => ' + phpValue(attrs[k]); }).join(', ') + ']';
+        }
+
+        // Radio Image/Icon/Color: "key=Label|wert" -> [key => ['label' => Label, 'img'|'icon'|'color' => wert]]
+        function richRadioArray(items, extraKey) {
+            var pairs = items.map(function (o) {
+                var k = /^\d+$/.test(o.key) ? o.key : phpStr(o.key);
+                return k + ' => [' + phpStr('label') + ' => ' + phpStr(o.label) + ', ' + phpStr(extraKey) + ' => ' + phpStr(o.preview || '') + ']';
+            });
+            return '[' + pairs.join(', ') + ']';
+        }
+
+        // Aufgeloeste Bedingungen eines Items: nur die mit gueltigem Quellfeld.
+        function resolvedConditions(item) {
+            if (!item || !item.visibilityEnabled || !Array.isArray(item.visibilityConditions)) return [];
+            var out = [];
+            item.visibilityConditions.forEach(function (c) {
+                if (!c || !c.sourceUid) return;
+                var ref = resolveGeneratedConditionSource(c.sourceUid);
+                if (!ref) return;
+                out.push({ ref: ref, op: normalizeVisibilityOperator(c.operator), value: c.value || '' });
+            });
+            return out;
+        }
+
+        function hasVisibilityCondition(item) {
+            return resolvedConditions(item).length > 0;
+        }
+
+        function normalizeVisibilityOperator(operator) {
+            switch (String(operator || 'eq')) {
+                case 'eq': return '=';
+                case 'neq': return '!=';
+                case 'gt': return '>';
+                case 'lt': return '<';
+                case 'not_empty': return '!empty';
+                default: return String(operator || '=');
+            }
+        }
+
+        function conditionArgs(c) {
+            return conditionSourceLiteral(c.ref) + ', ' + phpStr(c.op) + ', ' + phpStr(c.value);
+        }
+
+        // Argumente fuer addConditionalFieldsetArea(): eine Bedingung klassisch, mehrere als Liste + Logik.
+        function conditionalFieldsetArgs(item) {
+            var conds = resolvedConditions(item);
+            if (conds.length === 1) return conditionArgs(conds[0]);
+            return '[' + conds.map(function (c) { return '[' + conditionArgs(c) + ']'; }).join(', ') + '], ' + phpStr(item.visibilityLogic === 'any' ? 'any' : 'all') + ", ''";
+        }
+
+        function conditionalWrapperAttrsPhp() {
+            return '[' + phpStr('class') + ' => ' + phpStr('mform-conditional-wrapper') + ']';
+        }
+
+        function resolveGeneratedConditionSource(uid) {
+            var source = findItem(uid, state);
+            if (!source || !isConditionSourceType(source.type)) {
+                return '';
+            }
+            var entry = computeNames(state).byUid[uid];
+            if (!entry) {
+                return '';
+            }
+            return entry.kind === 'slot' ? String(entry.n) : entry.key;
+        }
+
+        function conditionSourceLiteral(sourceRef) {
+            return /^\d+$/.test(String(sourceRef)) ? String(parseInt(sourceRef, 10)) : phpStr(sourceRef);
+        }
+
+        // Builds the call expression WITHOUT a leading `$mform` / `->`, so the
+        // caller can choose: top-level uses `$mform->...`, inner items use `->...`.
+        function renderCall(item, idArg) {
+            var def = TYPES[item.type];
+            var attrs = attrsForItem(item);
+            var attrPhp = attrsToPhp(attrs);
+            // Headline / Description: no id, single string argument
+            if (item.type === 'headline' || item.type === 'description') {
+                return def.method + '(' + phpStr(item.label || '') + ')';
+            }
+            // HTML-Block: kein id, ein String-Argument mit dem HTML
+            if (item.type === 'html') {
+                return def.method + '(' + phpStr(item.htmlContent || '') + ')';
+            }
+            if (item.type === 'alertinfo' || item.type === 'alertwarning' || item.type === 'alertdanger' || item.type === 'alertsuccess') {
+                return def.method + '(' + phpStr(item.alertText || '') + ')';
+            }
+            var idLit = typeof idArg === 'number' ? String(idArg) : phpStr(idArg);
+            // Select Multiple: nutzt eine andere Methode, sonst gleiche Signatur wie select.
+            var method = def.method;
+            if (item.type === 'select' && item.isMulti) {
+                method = 'addMultiSelectField';
+            }
+            var line = method + '(' + idLit;
+
+            switch (item.type) {
+                case 'select': {
+                    // Signature: addSelectField(id, options?, attributes?, size=1, defaultValue?)
+                    line += ', ' + optionsArray(parseOptions(item.options));
+                    var hasDefault = !!item.defaultValue;
+                    if (attrPhp || hasDefault) line += ', ' + (attrPhp || 'null');
+                    if (hasDefault) line += ', 1, ' + phpStr(item.defaultValue);
+                    break;
+                }
+                case 'radio':
+                case 'checkbox': {
+                    // Signature: addRadio/CheckboxField(id, options?, attributes?, defaultValue?)
+                    // Eine Checkbox ist ein Einzelschalter: MForm rendert nur die erste Option.
+                    line += ', ' + optionsArray(item.type === 'checkbox' ? parseOptions(item.options).slice(0, 1) : parseOptions(item.options));
+                    var hasDef = !!item.defaultValue;
+                    if (attrPhp || hasDef) line += ', ' + (attrPhp || 'null');
+                    if (hasDef) line += ', ' + phpStr(item.defaultValue);
+                    break;
+                }
+                case 'colorswatch': {
+                    line += ', ' + colorSwatchArray(parseColorSwatches(item.options));
+                    var hasDefaultColorValue = !!item.defaultValue;
+                    if (attrPhp || hasDefaultColorValue) line += ', ' + (attrPhp || 'null');
+                    if (hasDefaultColorValue) line += ', ' + phpStr(item.defaultValue);
+                    break;
+                }
+                case 'togglecheckbox': {
+                    line += ', ' + optionsArray(parseOptions(item.options).slice(0, 1));
+                    var hasDefaultValue = !!item.defaultValue;
+                    if (attrPhp || hasDefaultValue) line += ', ' + (attrPhp || 'null');
+                    if (hasDefaultValue) line += ', ' + phpStr(item.defaultValue);
+                    break;
+                }
+                case 'checkboxgroup':
+                    // Signature: addCheckboxGroupField(id, options?, attributes?)
+                    // (default-value via 'default-value' in attributes, handled in attrsForItem)
+                    line += ', ' + optionsArray(parseOptions(item.options));
+                    if (attrPhp) line += ', ' + attrPhp;
+                    break;
+                case 'tags': {
+                    // Signature: addTagsField(id, suggestions?, attributes?, defaultValue?)
+                    var hasTagsDefault = !!item.defaultValue;
+                    line += ', ' + phpValue(parseSuggestions(item.options));
+                    if (attrPhp || hasTagsDefault) line += ', ' + (attrPhp || 'null');
+                    if (hasTagsDefault) line += ', ' + phpStr(item.defaultValue);
+                    break;
+                }
+                case 'text':
+                case 'number':
+                case 'range':
+                case 'date':
+                case 'datetime':
+                case 'time':
+                case 'email':
+                case 'color':
+                case 'textarea': {
+                    // Signature: addText/TextAreaField(id, attributes?, defaultValue?)
+                    var hasD = !!item.defaultValue;
+                    if (attrPhp || hasD) line += ', ' + (attrPhp || 'null');
+                    if (hasD) line += ', ' + phpStr(item.defaultValue);
+                    break;
+                }
+                case 'hidden':
+                    line += ', ' + (item.defaultValue ? phpStr(item.defaultValue) : 'null');
+                    break;
+                case 'textreadonly':
+                case 'textareareadonly':
+                    // Signature: addText(Area)ReadOnlyField(id, value?, attributes?)
+                    line += ', ' + (item.defaultValue ? phpStr(item.defaultValue) : 'null');
+                    if (attrPhp) line += ', ' + attrPhp;
+                    break;
+                case 'radioimg':
+                case 'radioicon':
+                case 'radiocolor': {
+                    // Signature: addRadioImg/Icon/ColorField(id, options?, attributes?, defaultValue?)
+                    line += ', ' + richRadioArray(parseColorSwatches(item.options), RICH_RADIO_KEYS[item.type]);
+                    var hasRichDefault = !!item.defaultValue;
+                    if (attrPhp || hasRichDefault) line += ', ' + (attrPhp || 'null');
+                    if (hasRichDefault) line += ', ' + phpStr(item.defaultValue);
+                    break;
+                }
+                case 'media':
+                case 'medialist':
+                case 'imagelist':
+                case 'link':
+                case 'linklist': {
+                    var catLit = item.category ? (parseInt(item.category, 10) || phpStr(item.category)) : 'null';
+                    line += ', null, ' + catLit + (attrPhp ? ', ' + attrPhp : '');
+                    break;
+                }
+                case 'customlink':
+                    if (attrPhp) line += ', ' + attrPhp;
+                    if (item.defaultValue) line += ', ' + phpStr(item.defaultValue);
+                    break;
+                case 'customlinkmultiple':
+                    if (attrPhp) line += ', ' + attrPhp;
+                    break;
+            }
+            line += ')';
+            return line;
+        }
+
+        // Render top-level field as `$mform->call(...);` (with optional setFull chain)
+        function renderField(item, idArg, indent) {
+            var line = indent + '$mform->' + renderCall(item, idArg);
+            if (item.full && ['text', 'textarea', 'select', 'textreadonly', 'textareareadonly'].indexOf(item.type) !== -1) {
+                line += '\n' + indent + '    ->setFull()';
+            }
+            return line;
+        }
+
+        // Render inner field as `->call(...)` chained to MForm::factory()
+        function renderInnerChainLink(item, idArg, indent) {
+            var line = indent + '->' + renderCall(item, idArg);
+            if (item.full && ['text', 'textarea', 'select', 'textreadonly', 'textareareadonly'].indexOf(item.type) !== -1) {
+                line += '\n' + indent + '->setFull()';
+            }
+            return line;
+        }
+
+        function renderRepeaterStmt(item, idArg, indent) {
+            var idLit = typeof idArg === 'number' ? String(idArg) : phpStr(idArg);
+            var inner = renderRepeaterInner(item, indent);
+            var cfg = repeaterCfg(item);
+            return indent + '$mform->addFlexRepeaterElement(' + idLit + ', MForm::factory()\n'
+                + inner
+                + (cfg ? ',\n' + indent + '    ' + cfg : '')
+                + ');';
+        }
+
+        function renderInnerRepeaterChainLink(item, idArg, indent) {
+            // Inside an outer factory(), a nested repeater is added with
+            // ->addFlexRepeaterElement($id, MForm::factory()->...->..., $options)
+            var idLit = typeof idArg === 'number' ? String(idArg) : phpStr(idArg);
+            var inner = renderRepeaterInner(item, indent);
+            var cfg = repeaterCfg(item);
+            return indent + '->addFlexRepeaterElement(' + idLit + ', MForm::factory()\n'
+                + inner
+                + (cfg ? ',\n' + indent + '    ' + cfg : '')
+                + ')';
+        }
+
+        // Inside a factory()-Chain darf auch ein Fieldset als Wrapper liegen.
+        // ->addFieldsetArea($legend, MForm::factory()->...)
+        function renderInnerFieldsetChainLink(item, indent) {
+            var inner = renderRepeaterInner(item, indent);
+            var legend = item.label || '';
+            return indent + '->addFieldsetArea(' + phpStr(legend) + ', MForm::factory()\n' + inner + ')';
+        }
+
+        // Collapse / Accordion / Column / Inline: erstes Argument (Label bzw. Spaltenbreite),
+        // dann MForm::factory()->..., bei Collapse/Accordion optional open/hideToggle.
+        function renderSimpleWrapper(item, indent, chained) {
+            var inner = renderRepeaterInner(item, indent);
+            var head = chained ? indent + '->' : indent + '$mform->';
+            var first = item.type === 'column' ? String(parseInt(item.columnSize, 10) || 6) : phpStr(item.label || '');
+            var tail = '';
+            if (item.type === 'collapse' || item.type === 'accordion') {
+                if (item.collapseOpen || item.collapseHideToggle) {
+                    tail = ', ' + (item.collapseOpen ? 'true' : 'false') + (item.collapseHideToggle ? ', true' : '');
+                }
+            }
+            return head + TYPES[item.type].method + '(' + first + ', MForm::factory()\n' + inner + tail + ')' + (chained ? '' : ';');
+        }
+
+        function renderInnerItemChainLink(item, indent, meta) {
+            meta = meta || {};
+
+            if (isSimpleWrapperType(item.type)) {
+                return renderSimpleWrapper(item, indent, true);
+            }
+            if (item.type === 'fieldset') {
+                return renderInnerFieldsetChainLink(item, indent);
+            }
+            if (item.type === 'modal') {
+                return renderInnerModalChainLink(item, indent);
+            }
+            if (item.type === 'tab') {
+                return renderInnerTabChainLink(item, indent, !!meta.isFirstTab);
+            }
+            if (item.type === 'repeater') {
+                return renderInnerRepeaterChainLink(item, meta.idArg, indent);
+            }
+
+            return renderInnerChainLink(item, meta.idArg, indent);
+        }
+
+        function visibleIfChain(item, indent) {
+            var conds = resolvedConditions(item);
+            if (!conds.length) {
+                return '';
+            }
+            var out = '';
+            conds.forEach(function (c, index) {
+                out += '\n' + indent + (index === 0 ? '->setVisibleIf(' : '->addVisibleIf(') + conditionArgs(c) + ')';
+            });
+            if (conds.length > 1 && item.visibilityLogic === 'any') {
+                out += '\n' + indent + '->setVisibleIfLogic(' + phpStr('any') + ')';
+            }
+            return out;
+        }
+
+        function renderTopLevelItemStmt(item, idx, indent) {
+            if (item.type === 'repeater') {
+                return renderRepeaterStmt(item, codeIdFor(item), indent);
+            }
+            if (item.type === 'tab') {
+                var isFirstTab = idx === 0 || state[idx - 1].type !== 'tab';
+                return renderTabStmt(item, indent, isFirstTab);
+            }
+            if (item.type === 'fieldset') {
+                return renderFieldsetStmt(item, indent);
+            }
+            if (item.type === 'modal') {
+                return renderModalStmt(item, indent);
+            }
+            if (isSimpleWrapperType(item.type)) {
+                return renderSimpleWrapper(item, indent, false);
+            }
+
+            return renderField(item, codeIdFor(item), indent) + ';';
+        }
+
+        function renderConditionalFieldsetStmt(item, idx, indent) {
+            if (!hasVisibilityCondition(item)) {
+                return renderTopLevelItemStmt(item, idx, indent);
+            }
+
+            var inner = renderRepeaterInner(item, indent);
+
+            return indent + '$mform->addConditionalFieldsetArea('
+                + conditionalFieldsetArgs(item)
+                + ', ' + phpStr(item.label || '')
+                + ', MForm::factory()\n'
+                + inner
+                + ', ' + conditionalWrapperAttrsPhp()
+                + ');';
+        }
+
+        function renderTopLevelVisibleFieldStmt(item, indent) {
+            var line = indent + '$mform->' + renderCall(item, codeIdFor(item));
+            if (item.full && (item.type === 'text' || item.type === 'textarea' || item.type === 'select')) {
+                line += '\n' + indent + '    ->setFull()';
+            }
+            line += visibleIfChain(item, indent + '    ');
+            return line + ';';
+        }
+
+        function renderConditionalInnerFieldsetChainLink(item, indent) {
+            if (!hasVisibilityCondition(item)) {
+                return renderInnerFieldsetChainLink(item, indent);
+            }
+
+            var inner = renderRepeaterInner(item, indent);
+            return indent + '->addConditionalFieldsetArea('
+                + conditionalFieldsetArgs(item)
+                + ', ' + phpStr(item.label || '')
+                + ', MForm::factory()\n'
+                + inner
+                + ', ' + conditionalWrapperAttrsPhp()
+                + ')';
+        }
+
+        function renderModalStmt(item, indent) {
+            var inner = renderRepeaterInner(item, indent);
+            var label = item.label || '';
+            var btnClass = item.modalBtnClass || 'btn-default';
+            var align = item.modalAlign || 'left';
+            return indent + '$mform->addModalElement(' + phpStr(label) + ', MForm::factory()\n'
+                + inner
+                + indent + '    , ' + phpStr(btnClass) + ', ' + phpStr(align) + ');';
+        }
+
+        function renderInnerModalChainLink(item, indent) {
+            var inner = renderRepeaterInner(item, indent);
+            var label = item.label || '';
+            var btnClass = item.modalBtnClass || 'btn-default';
+            var align = item.modalAlign || 'left';
+            return indent + '->addModalElement(' + phpStr(label) + ', MForm::factory()\n'
+                + inner
+                + indent + '    , ' + phpStr(btnClass) + ', ' + phpStr(align) + ')';
+        }
+
+        function renderTabStmt(item, indent, isFirst) {
+            var inner = renderRepeaterInner(item, indent);
+            var label = item.label || '';
+            var openTab = isFirst ? 'true' : 'false';
+            var args = phpStr(label) + ', MForm::factory()\n' + inner;
+            var tabAttrs = tabAttrsPhp(item);
+            if (tabAttrs) {
+                if (item.tabPullRight) {
+                    return indent + '$mform->addTabElement(' + args + ', ' + openTab + ', true, ' + tabAttrs + ');';
+                }
+                return indent + '$mform->addTabElement(' + args + ', ' + openTab + ', false, ' + tabAttrs + ');';
+            }
+            // Drop trailing args we can default; only emit pullRight if true
+            if (item.tabPullRight) {
+                return indent + '$mform->addTabElement(' + args + ', ' + openTab + ', true);';
+            }
+            if (isFirst) {
+                return indent + '$mform->addTabElement(' + args + ', true);';
+            }
+            return indent + '$mform->addTabElement(' + args + ');';
+        }
+
+        function renderInnerTabChainLink(item, indent, isFirst) {
+            var inner = renderRepeaterInner(item, indent);
+            var label = item.label || '';
+            var openTab = isFirst ? 'true' : 'false';
+            var args = phpStr(label) + ', MForm::factory()\n' + inner;
+            var tabAttrs = tabAttrsPhp(item);
+            if (tabAttrs) {
+                return indent + '->addTabElement(' + args + ', ' + openTab + ', ' + (item.tabPullRight ? 'true' : 'false') + ', ' + tabAttrs + ')';
+            }
+            if (item.tabPullRight) {
+                return indent + '->addTabElement(' + args + ', ' + openTab + ', true)';
+            }
+            if (isFirst) {
+                return indent + '->addTabElement(' + args + ', true)';
+            }
+            return indent + '->addTabElement(' + args + ')';
+        }
+
+        function tabAttrsPhp(item) {
+            var attrs = {};
+            if (item.tabIcon) attrs['tab-icon'] = item.tabIcon;
+            if (item.tabStyle) attrs['tab-style'] = item.tabStyle;
+            if (item.tabLayout) attrs['tab-layout'] = item.tabLayout;
+            return attrsToPhp(attrs);
+        }
+
+        function renderFieldsetStmt(item, indent) {
+            var inner = renderRepeaterInner(item, indent);
+            var legend = item.label || '';
+            return indent + '$mform->addFieldsetArea(' + phpStr(legend) + ', MForm::factory()\n' + inner + ');';
+        }
+
+        function repeaterCfg(item) {
+            var minVal = item.repeaterMin !== '' ? parseInt(item.repeaterMin, 10) : null;
+            var maxVal = item.repeaterMax !== '' ? parseInt(item.repeaterMax, 10) : null;
+            var defCnt = item.repeaterDefaultCount !== '' ? parseInt(item.repeaterDefaultCount, 10) : null;
+            var parts = [];
+            if (minVal !== null && !isNaN(minVal)) parts.push("'min' => " + minVal);
+            if (maxVal !== null && !isNaN(maxVal)) parts.push("'max' => " + maxVal);
+            if (defCnt !== null && !isNaN(defCnt)) parts.push("'default_count' => " + defCnt);
+            if (item.label) parts.push("'label' => " + phpStr(item.label));
+            // Flags only emit when DIFFERENT from MForm core default.
+            // Core defaults: collapsed=false, first_open=false, show_toggle_all=true, show_add_button=true,
+            //                open=true, copy_paste=true, confirm_delete=true.
+            if (item.repeaterCollapsed === true) parts.push("'collapsed' => true");
+            if (item.repeaterFirstOpen === true) parts.push("'first_open' => true");
+            if (item.repeaterShowToggleAll === false) parts.push("'show_toggle_all' => false");
+            if (item.repeaterShowAddButton === false) parts.push("'show_add_button' => false");
+            if (item.repeaterOpen === false) parts.push("'open' => false");
+            if (item.repeaterCopyPaste === false) parts.push("'copy_paste' => false");
+            if (item.repeaterConfirmDelete === false) parts.push("'confirm_delete' => false");
+            if (item.repeaterConfirmDeleteMsg) parts.push("'confirm_delete_msg' => " + phpStr(item.repeaterConfirmDeleteMsg));
+            if (item.repeaterBtnText) parts.push("'btn_text' => " + phpStr(item.repeaterBtnText));
+            if (item.repeaterBtnClass) parts.push("'btn_class' => " + phpStr(item.repeaterBtnClass));
+            if (item.repeaterItemTitle) parts.push("'item_title' => " + phpStr(item.repeaterItemTitle));
+            if (item.repeaterDescription) parts.push("'description' => " + phpStr(item.repeaterDescription));
+            return parts.length ? '[' + parts.join(', ') + ']' : '';
+        }
+
+        function renderRepeaterInner(item, indent) {
+            var children = item.children || [];
+            if (children.length === 0) {
+                return indent + '        // Felder hier ablegen\n';
+            }
+            var prevWasTab = false;
+            var lines = children.map(function (c) {
+                var itemIndent = indent + '        ';
+                var meta = {};
+
+                if (c.type === 'tab') {
+                    var isFirstTab = !prevWasTab;
+                    prevWasTab = true;
+                    meta.isFirstTab = isFirstTab;
+                    return renderInnerItemChainLink(c, itemIndent, meta);
+                }
+                if (c.type === 'fieldset') {
+                    prevWasTab = false;
+                    return hasVisibilityCondition(c)
+                        ? renderConditionalInnerFieldsetChainLink(c, itemIndent)
+                        : renderInnerFieldsetChainLink(c, itemIndent);
+                }
+                if (c.type === 'modal') {
+                    prevWasTab = false;
+                    return renderInnerModalChainLink(c, itemIndent);
+                }
+                if (isSimpleWrapperType(c.type)) {
+                    prevWasTab = false;
+                    return renderSimpleWrapper(c, itemIndent, true);
+                }
+                prevWasTab = false;
+                meta.idArg = codeIdFor(c);
+                return renderInnerItemChainLink(c, itemIndent, meta) + (hasVisibilityCondition(c) ? visibleIfChain(c, itemIndent) : '');
+            });
+            return lines.join('\n') + '\n';
+        }
+
+        function emitCode() {
+            if (state.length === 0) {
+                setCodeText($code, '<?php\n\n// Noch keine Felder hinzugefuegt.');
+                setCodeText($output, '<?php\n\n// Noch keine Felder hinzugefuegt.');
+                clearPersistedBuilderState();
+                var emptySlotMsg = document.querySelector('[data-fb-slot-warning]');
+                if (emptySlotMsg) {
+                    emptySlotMsg.style.display = 'none';
+                    emptySlotMsg.textContent = '';
+                }
+                return;
+            }
+            var lines = [];
+            lines.push('<?php');
+            lines.push('');
+            lines.push('use FriendsOfRedaxo\\MForm;');
+            lines.push('');
+            lines.push('$mform = MForm::factory();');
+            lines.push('');
+            state.forEach(function (item, idx) {
+                if (item.type === 'fieldset' && hasVisibilityCondition(item)) {
+                    lines.push(renderConditionalFieldsetStmt(item, idx, ''));
+                } else {
+                    var line = renderTopLevelItemStmt(item, idx, '');
+                    if (item.type !== 'fieldset' && hasVisibilityCondition(item) && !isContainerType(item.type)) {
+                        line = renderTopLevelVisibleFieldStmt(item, '');
+                    }
+                    lines.push(line);
+                }
+            });
+            lines.push('');
+            lines.push('echo $mform->show();');
+            setCodeText($code, lines.join('\n'));
+            schedulePreview();
+            // Warn once when any used id exceeds the conventional REX_VALUE/REX_MEDIA/... slot limit.
+            var overflow = computeNames(state).overflow;
+            var warnings = [];
+            if (overflow.length) {
+                warnings.push('Zu viele Felder fuer die REDAXO-Slots (REX_VALUE 1\u201320, REX_MEDIA/REX_MEDIALIST/REX_LINK/REX_LINKLIST je 1\u201310). Diese Felder werden nicht gespeichert: ' + overflow.join(', ') + '. Felder in einen Repeater verschieben oder auf mehrere Module aufteilen.');
+            }
+            var multiCheckboxes = collectMultiOptionCheckboxes(state);
+            if (multiCheckboxes.length) {
+                warnings.push('Eine Checkbox ist ein Einzelschalter und speichert nur die erste Option: ' + multiCheckboxes.join(', ') + '. Fuer eine Mehrfachauswahl die Checkbox-Gruppe verwenden.');
+            }
+            var slotMsg = document.querySelector('[data-fb-slot-warning]');
+            if (slotMsg) {
+                if (warnings.length) {
+                    slotMsg.style.display = '';
+                    slotMsg.textContent = 'Warnung: ' + warnings.join(' ');
+                } else {
+                    slotMsg.style.display = 'none';
+                    slotMsg.textContent = '';
+                }
+            }
+            emitOutputCode();
+        }
+
+
+        // ---- Output-Code (Modul-Output) -------------------------------------
+        //
+        // Erzeugt rein PHP-Variablen-Vorbereitung: kein HTML, kein rex_escape.
+        // Der Entwickler bekommt fertig gefuellte Variablen / Arrays und kann
+        // dann seine Ausgabe selbst stricken.
+
+        function rexVarFor(type, id) {
+            if (type === 'media') return 'REX_MEDIA[' + id + ']';
+            if (type === 'medialist' || type === 'imagelist') return 'REX_MEDIALIST[id=' + id + ']';
+            if (type === 'link') return 'REX_LINK[' + id + ']';
+            if (type === 'linklist') return 'REX_LINKLIST[id=' + id + ']';
+            return 'REX_VALUE[' + id + ']';
+        }
+
+
+        // Variablennamen im Ausgabe-Code: eindeutig ueber den ganzen Code (auch in den
+        // Repeater-Schleifen), damit gleiche Labels sich nicht gegenseitig ueberschreiben.
+        // Schleifen- und Systemvariablen sind reserviert.
+        var outputVarPool = {};
+
+        function resetOutputVarPool() {
+            outputVarPool = { row: true, row2: true, row3: true, l: true, this: true, globals: true, rex: true, mform: true };
+        }
+
+        function uniqueVarName(base) {
+            var name = String(base || 'feld').replace(/[^a-z0-9_]/gi, '_');
+            if (/^\d/.test(name)) {
+                name = 'feld_' + name;
+            }
+            var candidate = name, n = 2;
+            while (outputVarPool[candidate.toLowerCase()]) {
+                candidate = name + '_' + n++;
+            }
+            outputVarPool[candidate.toLowerCase()] = true;
+            return candidate;
+        }
+
+        function varNameFor(item) {
+            return uniqueVarName(slugify(item.label, item.type + '_' + item.id));
+        }
+
+        // Liefert die rechte Seite einer Variablen-Zuweisung fuer Top-Level-Felder.
+        function topLevelExpr(item) {
+            var rv = '"' + rexVarFor(item.type, codeIdFor(item)) + '"';
+            switch (item.type) {
+                case 'linklist':
+                    // Liste von Artikel-IDs (kommagetrennt gespeichert)
+                    return 'array_map("intval", array_filter(explode(",", ' + rv + ')))';
+                case 'medialist':
+                case 'imagelist':
+                case 'checkboxgroup':
+                case 'tags':
+                    // kommagetrennte Listen -> Array (laut Doku: array_filter(explode(...)))
+                    return 'array_filter(explode(",", ' + rv + '))';
+                case 'select':
+                    // Multi-Select speichert ebenfalls kommasepariert
+                    if (item.isMulti) {
+                        return 'array_filter(explode(",", ' + rv + '))';
+                    }
+                    return rv;
+                case 'customlink':
+                    // laut Doku: createLinkData() erkennt String- und Array-Format automatisch
+                    outputUses.outputHelper = true;
+                    return 'MFormOutputHelper::createLinkData(' + rv + ')';
+                case 'customlinkmultiple':
+                    // gespeichert als JSON-Array; pro Eintrag normalisieren
+                    outputUses.outputHelper = true;
+                    return 'array_map(static fn ($l) => MFormOutputHelper::createLinkData($l), json_decode(html_entity_decode(' + rv + ', ENT_QUOTES | ENT_HTML5, "UTF-8"), true) ?? [])';
+                case 'link':
+                    return '(int) ' + rv;
+                default:
+                    return rv;
+            }
+        }
+
+        // Inner-Repeater: rechte Seite, Daten kommen aus $row[key].
+        function childExpr(child, key) {
+            var access = '$row[' + phpStr(key) + '] ?? ""';
+            switch (child.type) {
+                case 'linklist':
+                    return 'array_map("intval", array_filter(explode(",", (string) (' + access + '))))';
+                case 'medialist':
+                case 'imagelist':
+                case 'checkboxgroup':
+                case 'tags':
+                    return 'array_filter(explode(",", (string) (' + access + ')))';
+                case 'select':
+                    if (child.isMulti) {
+                        return 'array_filter(explode(",", (string) (' + access + ')))';
+                    }
+                    return access;
+                case 'customlink':
+                    outputUses.outputHelper = true;
+                    return 'MFormOutputHelper::createLinkData(' + access + ')';
+                case 'customlinkmultiple':
+                    outputUses.outputHelper = true;
+                    return 'array_map(static fn ($l) => MFormOutputHelper::createLinkData($l), (array) (is_string(' + access + ') ? (json_decode(html_entity_decode((string) (' + access + '), ENT_QUOTES | ENT_HTML5, "UTF-8"), true) ?? []) : (' + access + ')))';
+                case 'link':
+                    return '(int) (' + access + ')';
+                case 'repeater':
+                    return '(array) (' + access + ')';
+                default:
+                    return access;
+            }
+        }
+
+        function renderTopLevelVar(item) {
+            var lines = [];
+            var name = varNameFor(item);
+            var lbl = item.label ? ' (' + item.label + ')' : '';
+            var hint = topLevelHint(item);
+            lines.push('// ' + item.type + lbl + (hint ? ' \u2013 ' + hint : ''));
+            optionValuesComment(item).forEach(function (v) { lines.push('//   ' + v); });
+            lines.push('$' + name + ' = ' + topLevelExpr(item) + ';');
+            return lines.join('\n');
+        }
+
+        // Wenn select/radio/checkbox Optionen hat, zeige die moeglichen Werte
+        // inkl. Labels als Kommentar (hilft beim Mapping in der Ausgabe).
+        function optionValuesComment(item) {
+            if (item.type !== 'select' && item.type !== 'radio' && item.type !== 'checkbox' && item.type !== 'checkboxgroup' && item.type !== 'togglecheckbox' && item.type !== 'colorswatch') {
+                return [];
+            }
+            var opts = item.type === 'colorswatch'
+                ? parseColorSwatches(item.options || '')
+                : parseOptions(item.options || '');
+            if (!opts.length) return [];
+            var lines = ['moegliche Werte:'];
+            opts.forEach(function (o) {
+                var key = String(o.key);
+                var label = String(o.label || '');
+                lines.push('  ' + key + (label && label !== key ? ' = ' + label : ''));
+            });
+            return lines;
+        }
+
+        // Kurzer Hinweis zum Inhaltstyp / wie man das Feld benutzt.
+        function topLevelHint(item) {
+            switch (item.type) {
+                case 'media':       return 'Dateiname in /media/, z.B. mit rex_url::media($name) verlinken';
+                case 'medialist':   return 'Array von Dateinamen (kommasepariert gespeichert)';
+                case 'imagelist':   return 'Array von Bilddateinamen (kommasepariert gespeichert)';
+                case 'link':        return 'Artikel-ID (int), z.B. rex_getUrl($id)';
+                case 'linklist':    return 'Array von Artikel-IDs (int[])';
+                case 'customlink':  return 'normalisiertes Array mit customlink_url, customlink_text, customlink_target, customlink_class';
+                case 'customlinkmultiple': return 'Array normalisierter Custom-Links (je Eintrag customlink_url/_text/_target/_class)';
+                case 'checkbox':    return 'Einzelschalter: Wert der Option (z. B. "1") wenn angehakt, sonst leer';
+                case 'togglecheckbox': return 'Einzelschalter: Wert der Option (z. B. "1") wenn aktiv, sonst leer';
+                case 'checkboxgroup': return item.cbgMode === 'radio' ? 'einzelner ausgewaehlter Wert (CheckboxGroup im Radio-Mode)' : 'Array der ausgewaehlten Werte (kommasepariert gespeichert)';
+                case 'tags':        return 'Array der Tags (kommasepariert gespeichert)';
+                case 'select':
+                    return item.isMulti ? 'Array der ausgewaehlten Werte (Multi-Select, kommasepariert gespeichert)' : 'einzelner ausgewaehlter Wert';
+                case 'radio':       return 'einzelner ausgewaehlter Wert';
+                case 'colorswatch': return 'gewaehlter Farbwertausdruck (z. B. #2f77bc oder .text-primary)';
+                case 'textarea':    return item.editor === 'markdown' ? 'Markdown-Text (im Frontend parsen)' : (item.editor ? 'HTML aus dem Editor' : 'roher Text mit Zeilenumbruechen');
+                case 'hidden':      return 'verstecktes Feld';
+                case 'number':      return 'Zahl als String (min/max/step ueber Attribute)';
+                case 'range':       return 'Zahl als String (Schieberegler, Live-Anzeige)';
+                case 'date':        return 'Datum als YYYY-MM-DD';
+                case 'datetime':    return 'Datum/Uhrzeit als YYYY-MM-DDTHH:MM';
+                case 'time':        return 'Uhrzeit als HH:MM';
+                case 'email':       return 'E-Mail-Adresse (Browser-Validierung)';
+                case 'color':       return 'Hex-Farbwert (#rrggbb)';
+                default:            return '';
+            }
+        }
+
+        // Kurzer Hinweis fuer Repeater-Children (gleich wie Top-Level, kompakter).
+        function childHint(child) {
+            return topLevelHint(child);
+        }
+
+        function renderRepeaterBlock(item, indent, rowVar) {
+            indent = indent || '';
+            rowVar = rowVar || 'row';
+            var lines = [];
+            var name = varNameFor(item);
+            var lbl = item.label ? ' (' + item.label + ')' : '';
+
+            if (rowVar === 'row') {
+                lines.push(indent + '// Repeater' + lbl + ' \u2013 dekodierte Items als Array von Zeilen');
+                outputUses.repeaterHelper = true;
+                lines.push(indent + '$' + name + ' = MFormRepeaterHelper::decode(' + codeIdFor(item) + ');');
+                lines.push(indent + 'foreach ($' + name + ' as $' + rowVar + ') {');
+            } else {
+                lines.push(indent + '// verschachtelter Repeater' + lbl);
+                lines.push(indent + 'foreach ((array) ($row[' + phpStr(codeIdFor(item)) + '] ?? []) as $' + rowVar + ') {');
+            }
+
+            var inner = indent + '    ';
+            // Fieldsets innerhalb des Repeaters sind reine UI-Wrapper -> Kinder hochziehen.
+            flattenStructuralChildren(item.children || []).forEach(function (entry) {
+                if (entry.kind === 'fs-marker') {
+                    lines.push(inner + entry.text);
+                    return;
+                }
+                var c = entry.item;
+                if (isStructureOnlyItem(c.type)) {
+                    return;
+                }
+                var key = codeIdFor(c);
+                if (c.type === 'repeater') {
+                    var sub = renderRepeaterBlock(c, inner, rowVar === 'row' ? 'row2' : 'row3');
+                    if (rowVar !== 'row') {
+                        sub = sub.replace(/\$row\[/g, '$' + rowVar + '[');
+                    }
+                    lines.push(sub);
+                } else if (isStructureOnlyItem(c.type)) {
+                    // ueberspringen
+                } else {
+                    var clbl = c.label ? ' (' + c.label + ')' : '';
+                    var ch = childHint(c);
+                    lines.push(inner + '// ' + c.type + clbl + (ch ? ' \u2013 ' + ch : ''));
+                    optionValuesComment(c).forEach(function (v) { lines.push(inner + '//   ' + v); });
+                    var line = inner + '$' + uniqueVarName(key) + ' = ' + childExpr(c, key) + ';';
+                    if (rowVar !== 'row') {
+                        line = line.replace(/\$row\[/g, '$' + rowVar + '[');
+                    }
+                    lines.push(line);
+                }
+            });
+            lines.push(indent + '}');
+            return lines.join('\n');
+        }
+
+        // Fieldsets sind reine Layout-Wrapper ohne eigene Speicherung. Fuer den
+        // Output-Code werden sie aufgeloest. Marker-Kommentare bleiben aber als
+        // visueller Trenner erhalten. Verschachtelte Fieldsets werden rekursiv
+        // entpackt.
+        function isAlertType(type) {
+            return type === 'alertinfo' || type === 'alertwarning' || type === 'alertdanger' || type === 'alertsuccess';
+        }
+
+        function isStructureOnlyItem(type) {
+            return type === 'headline' || type === 'description' || type === 'html' || isAlertType(type);
+        }
+
+        // Layout-Wrapper ohne eigene Speicherung (Fieldset, Modal, Tab, Collapse, Accordion, Column, Inline)
+        function isLayoutWrapperType(type) {
+            return isContainerType(type) && type !== 'repeater';
+        }
+
+        function wrapperMarker(item) {
+            var label = TYPES[item.type] ? TYPES[item.type].label : item.type;
+            return '// ----- ' + label + (item.label ? ': ' + item.label : '') + ' -----';
+        }
+
+        function flattenStructuralChildren(children) {
+            var out = [];
+            (children || []).forEach(function (c) {
+                if (isLayoutWrapperType(c.type)) {
+                    out.push({ kind: 'fs-marker', text: wrapperMarker(c) });
+                    flattenStructuralChildren(c.children || []).forEach(function (e) { out.push(e); });
+                    return;
+                }
+                out.push({ kind: 'item', item: c });
+            });
+            return out;
+        }
+
+        function emitOutputCode() {
+            if (state.length === 0) {
+                setCodeText($output, '<?php\n\n// Noch keine Felder hinzugefuegt.');
+                return;
+            }
+            // Tracking, welche use-Statements wir brauchen.
+            outputUses.outputHelper = false;
+            outputUses.repeaterHelper = false;
+            resetOutputVarPool();
+            var body = [];
+            body.push('// =============================================================');
+            body.push('// Modul-Output: Variablen aus den Eingabefeldern befuellen.');
+            body.push('// Variablennamen werden aus den Labels abgeleitet (slugify:');
+            body.push('//   Kleinbuchstaben, Umlaute -> ae/oe/ue/ss, Sonderzeichen -> _).');
+            body.push('// Ohne Label wird ein Fallback wie field_<id> verwendet.');
+            body.push('// HTML, Escaping (rex_escape), Fallbacks etc. nach Bedarf selbst');
+            body.push('// ergaenzen.');
+            body.push('// =============================================================');
+            body.push('');
+            state.forEach(function (item) {
+                if (isLayoutWrapperType(item.type)) {
+                    body.push(wrapperMarker(item));
+                    flattenStructuralChildren(item.children || []).forEach(function (entry) {
+                        if (entry.kind === 'fs-marker') { body.push(entry.text); return; }
+                        var c = entry.item;
+                        if (c.type === 'repeater') {
+                            body.push(renderRepeaterBlock(c, ''));
+                            body.push('');
+                        } else if (isStructureOnlyItem(c.type)) {
+                            // ueberspringen (reine Form-Strukturhinweise)
+                        } else {
+                            body.push(renderTopLevelVar(c));
+                            body.push('');
+                        }
+                    });
+                } else if (item.type === 'repeater') {
+                    body.push(renderRepeaterBlock(item, ''));
+                    body.push('');
+                } else if (isStructureOnlyItem(item.type)) {
+                    // ueberspringen
+                } else {
+                    body.push(renderTopLevelVar(item));
+                    body.push('');
+                }
+            });
+
+            // use-Statements vorne dranhaengen, falls noetig.
+            var head = [];
+            if (outputUses.outputHelper) {
+                head.push('use FriendsOfRedaxo\\MForm\\Utils\\MFormOutputHelper;');
+            }
+            if (outputUses.repeaterHelper) {
+                head.push('use FriendsOfRedaxo\\MForm\\Repeater\\MFormRepeaterHelper;');
+            }
+            if (head.length > 0) {
+                head.push('');
+            }
+
+            setCodeText($output, ['<?php', ''].concat(head, body).join('\n').replace(/\n{3,}/g, '\n\n').trimEnd());
+            persistBuilderState();
+        }
+
+        // ---- Init -----------------------------------------------------------
+
+        restoreBuilderState();
+        renderCanvas();
+        emitCode();
+        initCodeViewers();
+    } // end run()
+})();

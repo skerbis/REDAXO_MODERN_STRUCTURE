@@ -1,0 +1,439 @@
+<?php
+
+declare(strict_types=1);
+
+namespace FriendsOfRedaxo\Api\Tests;
+
+/**
+ * Tests für die Metainfo API (Feldtypen, Felddefinitionen, Werte).
+ *
+ * Voraussetzungen am API-Token:
+ *   metainfo/types/list,
+ *   metainfo/fields/list, metainfo/fields/get, metainfo/fields/add,
+ *   metainfo/fields/update, metainfo/fields/delete,
+ *   metainfo/articles/values/get, metainfo/articles/values/update,
+ *   metainfo/categories/values/get, metainfo/categories/values/update,
+ *   metainfo/media/values/get, metainfo/media/values/update,
+ *   metainfo/clangs/values/get, metainfo/clangs/values/update
+ */
+class MetainfoApiTest extends ApiTestCase
+{
+    // ==================== TYPES ====================
+
+    public function testListTypes(): void
+    {
+        $response = $this->get('metainfo/types');
+
+        $this->assertSuccess($response);
+        $this->assertIsArray($response['data']['data']);
+        $this->assertGreaterThanOrEqual(13, count($response['data']['data']), 'Mindestens 13 Default-Feldtypen erwartet.');
+
+        $first = $response['data']['data'][0];
+        $this->assertArrayHasKey('id', $first);
+        $this->assertArrayHasKey('label', $first);
+        $this->assertArrayHasKey('dbtype', $first);
+        $this->assertArrayHasKey('dblength', $first);
+    }
+
+    // ==================== FIELDS CRUD ====================
+
+    public function testFieldCrudRoundtrip(): void
+    {
+        $name = 'art_test_' . uniqid();
+
+        $create = $this->post('metainfo/fields', [
+            'name' => $name,
+            'title' => 'API Test Field',
+            'type_id' => 1, // text
+            'priority' => 99,
+        ]);
+
+        $this->assertStatus(201, $create);
+        $this->assertHasField($create, 'id');
+        $fieldId = (int) $create['data']['id'];
+
+        $get = $this->get('metainfo/fields/' . $fieldId);
+        $this->assertSuccess($get);
+        $this->assertSame($name, $get['data']['name']);
+        $this->assertSame('art_', $get['data']['prefix']);
+        $this->assertSame(1, $get['data']['type_id']);
+
+        $update = $this->patch('metainfo/fields/' . $fieldId, [
+            'title' => 'API Test Field (updated)',
+            'priority' => 50,
+        ]);
+        $this->assertSuccess($update);
+
+        $reread = $this->get('metainfo/fields/' . $fieldId);
+        $this->assertSame('API Test Field (updated)', $reread['data']['title']);
+
+        $delete = $this->delete('metainfo/fields/' . $fieldId);
+        $this->assertSuccess($delete);
+
+        $gone = $this->get('metainfo/fields/' . $fieldId);
+        $this->assertStatus(404, $gone);
+    }
+
+    public function testFieldAddRejectsInvalidPrefix(): void
+    {
+        $response = $this->post('metainfo/fields', [
+            'name' => 'foo_bar_' . uniqid(),
+            'title' => 'Should fail',
+            'type_id' => 1,
+        ]);
+
+        $this->assertStatus(400, $response);
+        $this->assertError($response);
+    }
+
+    public function testFieldAddRejectsDuplicate(): void
+    {
+        $name = 'art_test_dup_' . uniqid();
+
+        $first = $this->post('metainfo/fields', [
+            'name' => $name,
+            'title' => 'Duplicate test',
+            'type_id' => 1,
+        ]);
+        $this->assertStatus(201, $first);
+        $fieldId = (int) $first['data']['id'];
+
+        try {
+            $second = $this->post('metainfo/fields', [
+                'name' => $name,
+                'title' => 'Duplicate test',
+                'type_id' => 1,
+            ]);
+            $this->assertStatus(409, $second);
+            $this->assertError($second);
+        } finally {
+            $this->delete('metainfo/fields/' . $fieldId);
+        }
+    }
+
+    public function testFieldUpdateRejectsRename(): void
+    {
+        $name = 'art_test_rename_' . uniqid();
+
+        $create = $this->post('metainfo/fields', [
+            'name' => $name,
+            'title' => 'Rename test',
+            'type_id' => 1,
+        ]);
+        $this->assertStatus(201, $create);
+        $fieldId = (int) $create['data']['id'];
+
+        try {
+            $update = $this->patch('metainfo/fields/' . $fieldId, [
+                'name' => 'art_test_renamed',
+            ]);
+            $this->assertStatus(422, $update);
+        } finally {
+            $this->delete('metainfo/fields/' . $fieldId);
+        }
+    }
+
+    public function testFieldGetNotFound(): void
+    {
+        $response = $this->get('metainfo/fields/999999');
+        $this->assertStatus(404, $response);
+    }
+
+    // ==================== VALUES ====================
+
+    public function testArticleValuesRoundtrip(): void
+    {
+        $name = 'art_test_value_' . uniqid();
+        $clangId = self::$config['test_data']['existing_clang_id'];
+        $articleId = $this->findNonStartArticleId($clangId);
+
+        $create = $this->post('metainfo/fields', [
+            'name' => $name,
+            'title' => 'Value roundtrip',
+            'type_id' => 1, // text
+        ]);
+        $this->assertStatus(201, $create);
+        $fieldId = (int) $create['data']['id'];
+
+        try {
+            $initial = $this->get('structure/articles/' . $articleId . '/metainfo', ['clang_id' => $clangId]);
+            $this->assertSuccess($initial);
+            $this->assertArrayHasKey($name, $initial['data']['data']);
+
+            $payload = 'hello-' . uniqid();
+            $patch = $this->patch('structure/articles/' . $articleId . '/metainfo?clang_id=' . $clangId, [
+                $name => $payload,
+            ]);
+            $this->assertSuccess($patch);
+            $this->assertSame($payload, $patch['data']['data'][$name]);
+
+            $verify = $this->get('structure/articles/' . $articleId . '/metainfo', ['clang_id' => $clangId]);
+            $this->assertSame($payload, $verify['data']['data'][$name]);
+
+            // Reset value
+            $this->patch('structure/articles/' . $articleId . '/metainfo?clang_id=' . $clangId, [
+                $name => '',
+            ]);
+        } finally {
+            $this->delete('metainfo/fields/' . $fieldId);
+        }
+    }
+
+    public function testArticleValuesPatchRejectsUnknownField(): void
+    {
+        $articleId = $this->findNonStartArticleId(self::$config['test_data']['existing_clang_id']);
+
+        $response = $this->patch('structure/articles/' . $articleId . '/metainfo', [
+            'art_definitely_not_a_real_field_' . uniqid() => 'x',
+        ]);
+
+        $this->assertStatus(422, $response);
+        $this->assertError($response);
+    }
+
+    public function testMediaValuesGetReturnsMap(): void
+    {
+        $response = $this->get('metainfo/fields', ['filter[prefix]' => 'med_', 'per_page' => 1]);
+        $this->assertSuccess($response);
+
+        // Find any existing media for this smoke test. Media routes are keyed by filename.
+        $mediaList = $this->get('media', ['per_page' => 1]);
+        if (empty($mediaList['data']['data'])) {
+            $this->markTestSkipped('Keine Media-Items in der DB für Smoke-Test vorhanden.');
+        }
+        $filename = $mediaList['data']['data'][0]['filename'];
+
+        $values = $this->get('media/' . $filename . '/metainfo');
+        $this->assertSuccess($values);
+        $this->assertArrayHasKey('data', $values['data']);
+    }
+
+    public function testCategoryValuesRoundtrip(): void
+    {
+        $name = 'cat_test_value_' . uniqid();
+        $clangId = self::$config['test_data']['existing_clang_id'];
+        $categoryId = self::$config['test_data']['existing_category_id'];
+
+        $create = $this->post('metainfo/fields', [
+            'name' => $name,
+            'title' => 'Category value roundtrip',
+            'type_id' => 1,
+        ]);
+        $this->assertStatus(201, $create);
+        $fieldId = (int) $create['data']['id'];
+
+        try {
+            $initial = $this->get('structure/categories/' . $categoryId . '/metainfo', ['clang_id' => $clangId]);
+            $this->assertSuccess($initial);
+            $this->assertArrayHasKey($name, $initial['data']['data']);
+
+            $payload = 'cat-hello-' . uniqid();
+            $patch = $this->patch('structure/categories/' . $categoryId . '/metainfo?clang_id=' . $clangId, [
+                $name => $payload,
+            ]);
+            $this->assertSuccess($patch);
+            $this->assertSame($payload, $patch['data']['data'][$name]);
+
+            $verify = $this->get('structure/categories/' . $categoryId . '/metainfo', ['clang_id' => $clangId]);
+            $this->assertSame($payload, $verify['data']['data'][$name]);
+
+            $this->patch('structure/categories/' . $categoryId . '/metainfo?clang_id=' . $clangId, [
+                $name => '',
+            ]);
+        } finally {
+            $this->delete('metainfo/fields/' . $fieldId);
+        }
+    }
+
+    public function testMediaValuesRoundtrip(): void
+    {
+        $mediaList = $this->get('media', ['per_page' => 1]);
+        if (empty($mediaList['data']['data'])) {
+            $this->markTestSkipped('Keine Media-Items in der DB vorhanden.');
+        }
+        $filename = $mediaList['data']['data'][0]['filename'];
+
+        $name = 'med_test_value_' . uniqid();
+        $create = $this->post('metainfo/fields', [
+            'name' => $name,
+            'title' => 'Media value roundtrip',
+            'type_id' => 1,
+        ]);
+        $this->assertStatus(201, $create);
+        $fieldId = (int) $create['data']['id'];
+
+        try {
+            $payload = 'med-hello-' . uniqid();
+            $patch = $this->patch('media/' . $filename . '/metainfo', [
+                $name => $payload,
+            ]);
+            $this->assertSuccess($patch);
+            $this->assertSame($payload, $patch['data']['data'][$name]);
+
+            $verify = $this->get('media/' . $filename . '/metainfo');
+            $this->assertSame($payload, $verify['data']['data'][$name]);
+
+            $this->patch('media/' . $filename . '/metainfo', [$name => '']);
+        } finally {
+            $this->delete('metainfo/fields/' . $fieldId);
+        }
+    }
+
+    /**
+     * Ein Objekt auf einem Skalar-Feld wurde bis #66 still zu null verworfen und
+     * mit 200 quittiert. Der zweite Wert im Body ist der Kontrollwert: er beweist,
+     * dass der Patch als Ganzes abgelehnt wird und nicht teilweise durchläuft.
+     */
+    /**
+     * Schlaegt das ALTER beim Anlegen fehl, meldete die API bis #67 trotzdem 201 und liess
+     * eine Zeile ohne Spalte zurueck, die sich danach nicht mehr loeschen liess. Der
+     * ueberlange Name erzwingt den Fehlschlag, ohne die Tabelle zu veraendern: MySQL
+     * erlaubt hoechstens 64 Zeichen fuer einen Spaltennamen.
+     */
+    public function testFieldAddRollsBackWhenColumnCannotBeCreated(): void
+    {
+        $name = 'art_' . str_repeat('x', 70);
+
+        $create = $this->post('metainfo/fields', [
+            'name' => $name,
+            'title' => 'Rollback probe',
+            'type_id' => 1,
+        ]);
+
+        $this->assertStatus(500, $create);
+
+        $list = $this->get('metainfo/fields', ['per_page' => 200]);
+        $names = array_column($list['data']['data'], 'name');
+        $this->assertNotContains($name, $names, 'Die Felddefinition darf nach dem fehlgeschlagenen ALTER nicht zurueckbleiben.');
+    }
+
+    public function testMediaValuesRejectNonScalarOnScalarField(): void
+    {
+        $mediaList = $this->get('media', ['per_page' => 1]);
+        if (empty($mediaList['data']['data'])) {
+            $this->markTestSkipped('Keine Media-Items in der DB vorhanden.');
+        }
+        $filename = $mediaList['data']['data'][0]['filename'];
+
+        $scalarField = 'med_reject_' . uniqid();
+        $controlField = 'med_control_' . uniqid();
+        $scalar = $this->post('metainfo/fields', ['name' => $scalarField, 'title' => 'Reject non-scalar', 'type_id' => 1]);
+        $this->assertStatus(201, $scalar);
+        $control = $this->post('metainfo/fields', ['name' => $controlField, 'title' => 'Control value', 'type_id' => 1]);
+        $this->assertStatus(201, $control);
+
+        try {
+            $patch = $this->patch('media/' . $filename . '/metainfo', [
+                $scalarField => ['de' => 'Hallo'],
+                $controlField => 'KONTROLLWERT',
+            ]);
+
+            $this->assertStatus(400, $patch);
+            $this->assertArrayHasKey($scalarField, $patch['data']['details']);
+            $this->assertArrayNotHasKey($controlField, $patch['data']['details']);
+
+            // Der Kontrollwert darf nicht geschrieben worden sein.
+            $verify = $this->get('media/' . $filename . '/metainfo');
+            $this->assertNull($verify['data']['data'][$controlField]);
+        } finally {
+            $this->delete('metainfo/fields/' . (int) $scalar['data']['id']);
+            $this->delete('metainfo/fields/' . (int) $control['data']['id']);
+        }
+    }
+
+    /** Multi-Value-Felder nehmen Arrays weiterhin an — nur verschachtelte Werte darin nicht. */
+    public function testMediaValuesAcceptArrayOnMultiValueFieldButRejectNested(): void
+    {
+        $mediaList = $this->get('media', ['per_page' => 1]);
+        if (empty($mediaList['data']['data'])) {
+            $this->markTestSkipped('Keine Media-Items in der DB vorhanden.');
+        }
+        $filename = $mediaList['data']['data'][0]['filename'];
+
+        $name = 'med_multi_' . uniqid();
+        // type_id 5 = CHECKBOX, ein Multi-Value-Typ
+        $create = $this->post('metainfo/fields', ['name' => $name, 'title' => 'Multi value', 'type_id' => 5]);
+        $this->assertStatus(201, $create);
+        $fieldId = (int) $create['data']['id'];
+
+        try {
+            $ok = $this->patch('media/' . $filename . '/metainfo', [$name => ['a', 'b']]);
+            $this->assertSuccess($ok);
+            $this->assertSame(['a', 'b'], $ok['data']['data'][$name]);
+
+            $nested = $this->patch('media/' . $filename . '/metainfo', [$name => ['a', ['b']]]);
+            $this->assertStatus(400, $nested);
+
+            $this->patch('media/' . $filename . '/metainfo', [$name => []]);
+        } finally {
+            $this->delete('metainfo/fields/' . $fieldId);
+        }
+    }
+
+    public function testClangValuesGetReturnsMap(): void
+    {
+        $clangId = self::$config['test_data']['existing_clang_id'];
+
+        $response = $this->get('system/clangs/' . $clangId . '/metainfo');
+
+        $this->assertSuccess($response);
+        $this->assertArrayHasKey('data', $response['data']);
+    }
+
+    public function testClangValuesRoundtrip(): void
+    {
+        $clangId = self::$config['test_data']['existing_clang_id'];
+
+        $name = 'clang_test_value_' . uniqid();
+        $create = $this->post('metainfo/fields', [
+            'name' => $name,
+            'title' => 'Clang value roundtrip',
+            'type_id' => 1,
+        ]);
+        $this->assertStatus(201, $create);
+        $fieldId = (int) $create['data']['id'];
+
+        try {
+            $payload = 'clang-hello-' . uniqid();
+            $patch = $this->patch('system/clangs/' . $clangId . '/metainfo', [
+                $name => $payload,
+            ]);
+            $this->assertSuccess($patch);
+            $this->assertSame($payload, $patch['data']['data'][$name]);
+
+            $verify = $this->get('system/clangs/' . $clangId . '/metainfo');
+            $this->assertSame($payload, $verify['data']['data'][$name]);
+
+            $this->patch('system/clangs/' . $clangId . '/metainfo', [$name => '']);
+        } finally {
+            $this->delete('metainfo/fields/' . $fieldId);
+        }
+    }
+
+    public function testValuesGetReturnsNotFoundForMissingArticle(): void
+    {
+        $response = $this->get('structure/articles/999999/metainfo');
+        $this->assertStatus(404, $response);
+    }
+
+    /**
+     * The metainfo endpoint refuses start articles (their meta lives on the category).
+     * Find any non-start article via the list API for tests that need a real article id.
+     */
+    private function findNonStartArticleId(int $clangId): int
+    {
+        // The list endpoint has no startarticle filter, so we page through and pick
+        // the first non-start article ourselves.
+        $list = $this->get('structure/articles', [
+            'filter' => ['clang_id' => $clangId],
+            'per_page' => 100,
+        ]);
+        $this->assertSuccess($list);
+        foreach ($list['data']['data'] ?? [] as $article) {
+            if (0 === (int) ($article['startarticle'] ?? 0)) {
+                return (int) $article['id'];
+            }
+        }
+        $this->markTestSkipped('Keine Nicht-Start-Artikel in der DB vorhanden.');
+    }
+}

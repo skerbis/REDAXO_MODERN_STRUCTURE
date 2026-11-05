@@ -1,0 +1,73 @@
+<?php
+
+/**
+ * yform.
+ *
+ * @author jan.kristinus[at]redaxo[dot]org Jan Kristinus
+ * @author <a href="http://www.yakamara.de">www.yakamara.de</a>
+ */
+
+class rex_yform_value_hidden extends rex_yform_value_abstract
+{
+    public function loadParams(&$params, $elements = [])
+    {
+        // Bypass the abstract's setLabel($this->getElement(2)) because for
+        // `hidden`, element 2 is the VALUE — not a label. Coerce all property
+        // assignments to string so the typed parent props don't TypeError when
+        // callers pass non-string defaults (#1350).
+        rex_yform_base_abstract::loadParams($params, $elements);
+        $this->setName((string) $this->getElement(1));
+        $this->setLabel('');
+        $this->type = (string) $this->getElement(0);
+    }
+
+    public function setValue($value)
+    {
+        if ('GET' == $this->getElement(3) && isset($_GET[$this->getElement(2)])) {
+            $this->value = rex_get($this->getElement(2), 'string', '');
+            $this->params['form_action_query_params'][$this->getElement(2)] = $this->value;
+        } elseif ('REQUEST' == $this->getElement(3) && isset($_REQUEST[$this->getElement(2)])) {
+            $this->value = rex_request($this->getElement(2), 'string', '');
+        } elseif ('POST' == $this->getElement(3) && isset($_POST[$this->getElement(2)])) {
+            $this->value = rex_post($this->getElement(2), 'string', '');
+        } elseif ('SESSION' == $this->getElement(3) && null !== rex_session($this->getElement(2), 'string', null)) {
+            $this->value = rex_session($this->getElement(2), 'string', '');
+        } else {
+            $this->value = $this->getElement(2);
+        }
+    }
+
+    public function enterObject()
+    {
+        if ($this->needsOutput() && in_array($this->getElement(3), ['POST', 'REQUEST'])) {
+            $this->params['form_output'][$this->getId()] = $this->parse('value.hidden.tpl.php', ['fieldName' => $this->getElement(1)]);
+        }
+
+        $this->params['value_pool']['email'][$this->getName()] = $this->getValue();
+        if ($this->saveInDb('4')) {
+            $this->params['value_pool']['sql'][$this->getName()] = $this->getValue();
+        }
+    }
+
+    public function getDescription(): string
+    {
+        return 'hidden|fieldname|value||[no_db]' . "\n" . 'hidden|fieldname|key|REQUEST/GET/POST/SESSION|[no_db]';
+    }
+
+    public function getDefinitions(): array
+    {
+        return [
+            'type' => 'value',
+            'name' => 'hidden',
+            'values' => [
+                'name' => ['type' => 'name', 'label' => rex_i18n::msg('yform_values_defaults_name')],
+                'value' => ['type' => 'text', 'label' => 'Default-Wert oder Request-/Session-Key'],
+                'source' => ['type' => 'choice', 'label' => 'Quelle', 'choices' => '=,GET=GET,POST=POST,REQUEST=REQUEST,SESSION=SESSION', 'default' => ''],
+                'no_db' => ['type' => 'no_db', 'label' => rex_i18n::msg('yform_values_defaults_table'), 'default' => 0],
+            ],
+            'description' => 'Verstecktes Feld mit Default-Wert oder Wert aus GET/POST/REQUEST/SESSION.',
+            'db_type' => ['varchar(191)', 'text'],
+            'famous' => false,
+        ];
+    }
+}

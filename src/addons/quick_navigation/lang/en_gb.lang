@@ -1,0 +1,59 @@
+quick_navigation_title = Quick Navigation
+quick_navigation_help = Help
+quick_navigation_config = Settings
+quick_navigation_general = General
+quick_navigation_placeholder = category name/-id, user, domain
+quick_navigation_config_save = Save settings
+quick_navigation_config_saved = Favorites saved
+quick_navigation_info = User Settings
+perm_general_quick_navigation[] = Quick Navi
+quick_navigation_categories = Favorite selection
+perm_general_quick_navigation[history] = Quick Navi: recently edited articles and media
+perm_general_quick_navigation[all_changes] = Quick Navi: show recently edited data of all users
+perm_general_quick_navigation[settings] = Quick Navi: Favorites and settings
+quick_navigation_artdirections = Disable article browsing?
+quick_navigation_ignoreoffline = Ignore offline categories?
+quick_navigation_no_entries = No entries found
+quick_navigation_structure = Structure
+quick_navigation_clang = Language
+quick_navigation_article_history = Last edited articles
+quick_navigation_media_history = Last edited media
+quick_navigation_favorite = Favorites
+quick_navigation_manage_favorite = Add favorites
+quick_navigation_favorite_article_add = Add article to:
+quick_navigation_favorite_category_add = Add category to:
+quick_navigation_addon_pages = AddOn Pages
+quick_navigation_structure_favs = Structure
+quick_navigation_addon_pages_selection = AddOn Pages Favorites
+quick_navigation_yform = YForm
+quick_navigation_yform_add = Add dataset to:
+quick_navigation_yform_search_placeholder = Search datasets …
+quick_navigation_yform_scope = Search within this table
+quick_navigation_yform_all_tables = All tables
+quick_navigation_yform_filters = Filters
+quick_navigation_yform_close = Close
+quick_navigation_yform_highlight_fields = Additional highlighted columns
+quick_navigation_yform_highlight_fields_note = Comma-separated field names (e.g. sku, artnr) that are always shown first and highlighted in search results, in addition to name/title/cat/category, if the table has them.
+
+# Media sorting
+quick_navigation_media_sort_alpha = Sort by filename (A-Z)
+quick_navigation_media_sort_date = Sort by date (newest first)
+quick_navigation_media_sort_title = Sort by title (A-Z)
+
+# Media Live-Search
+quick_navigation_media_livesearch = Enable media live search?
+quick_navigation_yform_mode = YForm mode
+quick_navigation_yform_mode_dropdown = Classic dropdown (table list)
+quick_navigation_yform_mode_livesearch = Live search (overlay with dataset search)
+quick_navigation_yform_mode_note = Default is the classic dropdown. Live search has to be enabled per user.
+quick_navigation_media_live_search_placeholder = Live search...
+
+# Button Management
+quick_navigation_button_management = Hide buttons (Opt-Out)
+quick_navigation_button_management_note = Select the buttons you DON'T want to see. All other buttons remain visible.
+quick_navigation_button_article_navigation = Article Navigation (Browse)
+quick_navigation_button_watson = Watson
+quick_navigation_button_category = Category
+quick_navigation_button_article_history = Article History
+quick_navigation_button_yform = YForm
+quick_navigation_button_favorite = Favorites

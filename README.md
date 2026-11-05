@@ -4,23 +4,19 @@ Diese GitHub Action automatisiert das Setup einer neuen REDAXO-Installation mit 
 
 ## Funktionsweise
 
-Die Action führt folgende Schritte aus:
+Die Build-Logik liegt in `.github/scripts/build-redaxo.sh` und wird von beiden Workflows genutzt (lokal ausführbar mit `bash .github/scripts/build-redaxo.sh`). Sie führt folgende Schritte aus:
 
-1.  **Checkout Repository:** Checkt den aktuellen Code des Repository aus.
-2.  **PHP Umgebung einrichten:** Richtet eine PHP 8.1 Umgebung mit den benötigten Extensions (zip, curl, gd) ein.
-3.  **Node.js installieren:** Installiert Node.js
-4.  **Yarn installieren:** Installiert Yarn
-5.  **Neueste REDAXO Version ermitteln:** Ermittelt die neueste verfügbare REDAXO Version von der Github API.
-6.  **Temporäre Verzeichnisse erstellen:** Erstellt temporäre Verzeichnisse für die Bearbeitung.
-7.  **REDAXO herunterladen:** Lädt die REDAXO ZIP Datei der aktuellen Version herunter.
-8.  **REDAXO entpacken:** Entpackt die REDAXO ZIP Datei in das `public` Verzeichnis.
-9.  **Yakamara Ordnerstruktur erstellen:** Erstellt die spezifische Ordnerstruktur für Yakamara.
-10. **Setup Dateien kopieren:** Kopiert die notwendigen Setup Dateien aus `.github/files` an die richtige Position.
-11. **Addons herunterladen und installieren:** Lädt die konfigurierten Addons aus der `addons.txt` Datei herunter und installiert sie in das `src/addons` Verzeichnis.
-12. **Temporäre Verzeichnisse entfernen:** Entfernt alle temporären Verzeichnisse.
-13. **Release erstellen (primärer Workflow):** Erstellt ein GitHub Release mit einer ZIP-Datei, die die Version im Namen enthält (z.B. `redaxo-setup-5.15.0.zip`).
-   
+1.  **Neueste REDAXO Version ermitteln:** über die GitHub API (`redaxo/core`); optional kann beim Start des Workflows eine feste Version angegeben werden.
+2.  **REDAXO herunterladen:** und die SHA256-Prüfsumme gegen den von GitHub gelieferten Asset-Digest prüfen.
+3.  **Yakamara Ordnerstruktur erstellen:** REDAXO entpacken und in `public/`, `src/`, `var/` und `bin/` aufteilen.
+4.  **Setup Dateien kopieren:** aus `.github/files` an die richtige Position.
+5.  **Addons herunterladen:** aus `addons.txt` (neuestes Release, sonst Default-Branch) nach `src/addons`. Schlägt ein Download fehl, bricht der Build ab.
+6.  **Smoke-Test:** PHP-Syntaxcheck der Einstiegsdateien und `php bin/console --version`.
+7.  **Release erstellen (primärer Workflow):** GitHub Release mit ZIP-Datei, die die Version im Namen enthält (z.B. `redaxo-setup-5.21.6.zip`).
+
     *Alternative:* **Pull Request erstellen (sekundärer Workflow):** Erstellt einen Pull Request mit den erstellten Änderungen.
+
+Die Workflows nutzen PHP 8.4. Node.js und Yarn werden nicht benötigt.
 
 ## Konfiguration
 
@@ -38,7 +34,7 @@ Diese Action hat keine Eingabeparameter. Die Konfiguration wird über Dateien im
     * `index.backend.php`
     * `index.frontend.php`
     * `AppPathProvider.php`
-    * **`addons.txt`**: Eine Textdatei, die die URLs der Addon Repositories enthält. Jede URL steht in einer neuen Zeile. Diese muss im Root des Repository angelegt werden.
+    * **`addons.txt`**: Eine Textdatei, die die URLs der Addon Repositories enthält. Jede URL steht in einer neuen Zeile. Sie liegt unter `.github/files/addons.txt`.
 
 #### Beispiel für `addons.txt`
 
@@ -62,11 +58,11 @@ Die Ordner können umbenannt werden, wenn das original dem key nicht entspricht.
 1. Forken 
 2. addons.txt anpassen
 
-2.  **Erstelle einen Personal Access Token (PAT):**
+3.  **Optional: Personal Access Token (PAT) anlegen.** Ohne PAT wird der eingebaute `GITHUB_TOKEN` genutzt. Für den PR-Workflow muss dann unter *Settings → Actions → General* die Option „Allow GitHub Actions to create and approve pull requests“ aktiv sein. Mit PAT:
     *   Gehe zu deinen GitHub-Einstellungen -> Entwicklereinstellungen -> Personal access tokens.
     *   Erstelle einen neuen Token mit dem `repo` Scope.
     *   Kopiere den Token.
-3.  **Füge den PAT als Secret hinzu:**
+    **PAT als Secret hinzufügen:**
     *   Navigiere zu deinem Repository -> Einstellungen -> Secrets -> Actions
     *   Erstelle ein neues Secret mit dem Namen `PAT_TOKEN` und füge den kopierten Token als Wert ein.
 
@@ -115,9 +111,7 @@ Die neue Ordnerstruktur zielt darauf ab, eine moderne Basis für REDAXO-Projekte
 │   ├── data/              # Daten Dateien
 │   └── log/               # Log Dateien
 ├── .gitignore             # Git Ignorier Datei
-├── LICENSE                # Lizenzdatei
-├── package.json           # Node.js Package Datei
-└── addons.txt             # Liste der Addon URLs
+└── LICENSE.md             # Lizenzdatei
 ```
 
 **Erläuterung der Verzeichnisse und Dateien**
@@ -148,14 +142,10 @@ Die neue Ordnerstruktur zielt darauf ab, eine moderne Basis für REDAXO-Projekte
     *   **`log/`**: Enthält Log-Dateien.
 *   **`.gitignore`**:
     *   Definiert Dateien und Ordner, die von Git ignoriert werden sollen.
-*   **`LICENSE`**:
+*   **`LICENSE.md`**:
     *   Die Lizenzdatei des Projekts.
-*   **`package.json`**:
-    *   Eine Datei, die Informationen über die Node.js-Pakete enthält, die in deinem Projekt verwendet werden.
 *   **`README.md`**:
     *   Die Readme-Datei des Projekts.
-*   **`addons.txt`**:
-    *   Eine Textdatei, die eine Liste von Addon-URLs enthält. Jede URL steht in einer neuen Zeile.
 
 ## Beiträge
 

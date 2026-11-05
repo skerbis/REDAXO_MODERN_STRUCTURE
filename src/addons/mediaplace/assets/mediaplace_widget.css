@@ -1,0 +1,550 @@
+/* ============================================
+   Medienpool 3.0 – Widget Styles
+   ============================================ */
+
+/* ---- Container ---- */
+.mpw-container {
+    border: 1px solid #dfe3e9;
+    border-radius: 0;
+    background: #fff;
+    padding: 8px;
+    margin-top: 4px;
+}
+
+/* ---- Previews Grid ---- */
+.mpw-previews {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 40px;
+}
+
+/* ---- Empty state ---- */
+.mpw-empty {
+    width: 100%;
+    padding: 16px;
+    text-align: center;
+    color: #9ca5b2;
+    font-size: 13px;
+    border: 2px dashed #dfe3e9;
+    border-radius: 0;
+    cursor: default;
+}
+.mpw-empty i {
+    margin-right: 4px;
+    font-size: 16px;
+}
+
+/* Leerzustand mit aktivem Direkt-Upload: groesser, klickbar, wie die frueher
+   separate Dropzone -- ist jetzt der Leerzustand selbst statt eines eigenen
+   Elements. */
+.mpw-empty-upload {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.mpw-empty-upload i {
+    margin-right: 6px;
+    font-size: 16px;
+    color: #4b9ad9;
+    vertical-align: -1px;
+}
+.mpw-empty-upload:hover {
+    border-color: #4b9ad9;
+    background: #f3f6fb;
+}
+
+/* ---- Single Item ---- */
+.mpw-item {
+    position: relative;
+    width: 100px;
+    border: 1px solid #dfe3e9;
+    border-radius: 0;
+    background: #f3f6fb;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+.mpw-item:hover {
+    border-color: #4b9ad9;
+    box-shadow: 0 0 0 2px rgba(75,154,217,0.15);
+}
+
+/* Preview area */
+.mpw-item-preview {
+    width: 100px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: #f3f6fb;
+}
+.mpw-item-preview img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+    max-width: none !important;
+}
+.mpw-item-icon {
+    font-size: 28px;
+    color: #9ca5b2;
+}
+
+/* Untere Leiste (Auge-Button + Dateiname) */
+.mpw-item-bottom {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 0 2px;
+    border-top: 1px solid #dfe3e9;
+}
+.mpw-item-name {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 4px;
+    font-size: 10px;
+    line-height: 1.2;
+    color: #324050;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Remove button */
+.mpw-item-remove {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    font-size: 10px;
+    line-height: 20px;
+    text-align: center;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mpw-item:hover .mpw-item-remove {
+    opacity: 1;
+}
+.mpw-item-remove:hover {
+    background: #d9534f;
+}
+
+/* Details-ansehen-Button -- gleiches Muster wie der Remove-Button,
+   spiegelverkehrt oben links positioniert. */
+.mpw-item-view {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    font-size: 10px;
+    line-height: 20px;
+    text-align: center;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mpw-item:hover .mpw-item-view {
+    opacity: 1;
+}
+.mpw-item-view:hover {
+    background: #4b9ad9;
+}
+
+/* Auge-Button -- staendig sichtbar in der unteren Leiste (nicht nur bei
+   Hover wie die kleine Lupe oben links, die leicht uebersehen wird),
+   gleiche Aktion. */
+.mpw-item-eye {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 2px;
+    background: transparent;
+    color: #9ca5b2;
+    font-size: 11px;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mpw-item-eye:hover {
+    color: #fff;
+    background: #4b9ad9;
+}
+.mpw-view-list .mpw-item-bottom {
+    display: contents;
+}
+.mpw-view-list .mpw-item-eye {
+    display: none;
+}
+
+/* ---- Direkt-Upload: ganzer Container ist die Drop-Zone ---- */
+.mpw-container-dragover {
+    border-color: #4b9ad9;
+    background: #f3f6fb;
+    box-shadow: 0 0 0 2px rgba(75, 154, 217, 0.25);
+}
+.mpw-upload-progress {
+    width: 100%;
+    padding: 4px 8px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    color: #4b9ad9;
+    background: #f3f6fb;
+    border: 1px solid #dfe3e9;
+}
+.mpw-upload-progress-text {
+    margin-bottom: 3px;
+}
+.mpw-upload-progress-bar {
+    height: 4px;
+    background: #dfe3e9;
+    overflow: hidden;
+}
+.mpw-upload-progress-fill {
+    height: 100%;
+    width: 0;
+    background: #4b9ad9;
+    transition: width 0.15s ease;
+}
+.mpw-upload-progress.mpw-upload-progress-done {
+    color: #28a745;
+}
+.mpw-upload-progress.mpw-upload-progress-done .mpw-upload-progress-bar {
+    display: none;
+}
+
+/* ---- Listenansicht (Umschalter im Toolbar) ---- */
+.mpw-previews.mpw-view-list {
+    flex-direction: column;
+}
+.mpw-view-list .mpw-item {
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+.mpw-view-list .mpw-item-preview {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+.mpw-view-list .mpw-item-name {
+    flex: 1;
+    min-width: 0;
+    border-top: none;
+    padding: 0 8px;
+}
+.mpw-view-list .mpw-item-view,
+.mpw-view-list .mpw-item-remove {
+    position: static;
+    opacity: 1;
+    flex-shrink: 0;
+    margin-right: 4px;
+    background: transparent;
+    color: #9ca5b2;
+}
+.mpw-view-list .mpw-item-view:hover,
+.mpw-view-list .mpw-item-remove:hover {
+    color: #fff;
+}
+
+/* ---- Kategorie-Auswahl-Dialog (Direkt-Upload) ----
+   An document.body angehaengt statt #mp-overlay -- dieses Skript laeuft
+   unabhaengig vom Overlay-Kern, dessen Root existiert ggf. noch gar nicht. */
+.mpw-catpick-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.4);
+}
+.mpw-catpick-box {
+    width: 90%;
+    max-width: 420px;
+    padding: 20px;
+    background: #fff;
+    border-radius: 0;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+.mpw-catpick-title {
+    margin-bottom: 10px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #324050;
+}
+.mpw-catpick-info {
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: #777;
+}
+.mpw-catpick-select {
+    width: 100%;
+    padding: 6px 8px;
+    margin-bottom: 16px;
+    border: 1px solid #dfe3e9;
+    border-radius: 0;
+    background: #fff;
+    color: #324050;
+}
+.mpw-catpick-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+.mpw-catpick-cancel {
+    padding: 7px 16px;
+    border: 1px solid #dfe3e9;
+    border-radius: 0;
+    background: transparent;
+    color: #324050;
+    cursor: pointer;
+    font-size: 13px;
+}
+.mpw-catpick-confirm {
+    padding: 7px 16px;
+    border: none;
+    border-radius: 0;
+    background: var(--mp-confirm-btn-bg, #5bb585);
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+}
+.mpw-catpick-confirm:hover {
+    opacity: 0.88;
+}
+
+/* ---- Toolbar ---- */
+.mpw-toolbar {
+    display: flex;
+    gap: 4px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #dfe3e9;
+}
+.mpw-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.mpw-btn-clear-all {
+    gap: 5px;
+    margin-left: auto;
+}
+.mpw-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.mpw-btn-clear-marked {
+    color: #d9534f;
+    border-color: #d9534f;
+}
+
+/* ---- Mehrfachauswahl zum gemeinsamen Loeschen (Cmd/Ctrl-Klick) ---- */
+.mpw-item-marked {
+    border-color: #d9534f !important;
+    box-shadow: 0 0 0 2px rgba(217, 83, 79, 0.25);
+}
+
+/* ---- Drag & Drop Sort (Multi) ---- */
+.mpw-item[draggable="true"] {
+    cursor: grab;
+}
+.mpw-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+.mpw-item-dragging {
+    opacity: 0.4;
+}
+.mpw-drop-before {
+    box-shadow: -3px 0 0 0 #4b9ad9 !important;
+}
+.mpw-drop-after {
+    box-shadow: 3px 0 0 0 #4b9ad9 !important;
+}
+
+/* ---- Dark Mode ---- */
+
+/* Explicit dark mode */
+body.rex-theme-dark .mpw-container {
+    background: #1e2a3a;
+    border-color: #2d3e50;
+}
+body.rex-theme-dark .mpw-empty {
+    color: #6c8ea8;
+    border-color: #2d3e50;
+}
+body.rex-theme-dark .mpw-item {
+    background: #253344;
+    border-color: #2d3e50;
+}
+body.rex-theme-dark .mpw-item:hover {
+    border-color: #3c8dbc;
+}
+body.rex-theme-dark .mpw-item-preview {
+    background: #1a2636;
+}
+body.rex-theme-dark .mpw-item-bottom {
+    border-top-color: #2d3e50;
+}
+body.rex-theme-dark .mpw-item-name {
+    color: #8fa8c0;
+}
+body.rex-theme-dark .mpw-item-icon {
+    color: #6c8ea8;
+}
+body.rex-theme-dark .mpw-item-eye {
+    color: #6c8ea8;
+}
+body.rex-theme-dark .mpw-item-eye:hover {
+    color: #fff;
+    background: #3c8dbc;
+}
+body.rex-theme-dark .mpw-toolbar {
+    border-top-color: #2d3e50;
+}
+body.rex-theme-dark .mpw-container-dragover {
+    border-color: #3c8dbc;
+    background: #253344;
+}
+body.rex-theme-dark .mpw-empty-upload:hover {
+    border-color: #3c8dbc;
+    background: #253344;
+}
+body.rex-theme-dark .mpw-upload-progress {
+    background: #253344;
+    border-color: #2d3e50;
+    color: #8ab8e8;
+}
+body.rex-theme-dark .mpw-upload-progress-bar {
+    background: #2d3e50;
+}
+body.rex-theme-dark .mpw-upload-progress.mpw-upload-progress-done {
+    color: #4caf50;
+}
+body.rex-theme-dark .mpw-catpick-box {
+    background: #1e2a3a;
+    color: #cfe0ee;
+}
+body.rex-theme-dark .mpw-catpick-title {
+    color: #cfe0ee;
+}
+body.rex-theme-dark .mpw-catpick-info {
+    color: #8fa8c0;
+}
+body.rex-theme-dark .mpw-catpick-select {
+    background: #253344;
+    border-color: #2d3e50;
+    color: #cfe0ee;
+}
+body.rex-theme-dark .mpw-catpick-cancel {
+    border-color: #2d3e50;
+    color: #cfe0ee;
+}
+
+/* Auto dark mode */
+@media (prefers-color-scheme: dark) {
+    body.rex-has-theme:not(.rex-theme-light) .mpw-container {
+        background: #1e2a3a;
+        border-color: #2d3e50;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-empty {
+        color: #6c8ea8;
+        border-color: #2d3e50;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-item {
+        background: #253344;
+        border-color: #2d3e50;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-item:hover {
+        border-color: #3c8dbc;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-item-preview {
+        background: #1a2636;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-item-bottom {
+        border-top-color: #2d3e50;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-item-name {
+        color: #8fa8c0;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-item-icon {
+        color: #6c8ea8;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-item-eye {
+        color: #6c8ea8;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-item-eye:hover {
+        color: #fff;
+        background: #3c8dbc;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-toolbar {
+        border-top-color: #2d3e50;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-container-dragover {
+        border-color: #3c8dbc;
+        background: #253344;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-empty-upload:hover {
+        border-color: #3c8dbc;
+        background: #253344;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-upload-progress {
+        background: #253344;
+        border-color: #2d3e50;
+        color: #8ab8e8;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-upload-progress-bar {
+        background: #2d3e50;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-upload-progress.mpw-upload-progress-done {
+        color: #4caf50;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-catpick-box {
+        background: #1e2a3a;
+        color: #cfe0ee;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-catpick-title {
+        color: #cfe0ee;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-catpick-info {
+        color: #8fa8c0;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-catpick-select {
+        background: #253344;
+        border-color: #2d3e50;
+        color: #cfe0ee;
+    }
+    body.rex-has-theme:not(.rex-theme-light) .mpw-catpick-cancel {
+        border-color: #2d3e50;
+        color: #cfe0ee;
+    }
+}

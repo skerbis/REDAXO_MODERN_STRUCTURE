@@ -1,0 +1,31 @@
+{
+    "name": "yakamara/redaxo_yrewrite",
+
+    "require": {
+        "php": ">=8.1"
+    },
+
+    "require-dev": {
+        "friendsofredaxo/linter": "^1.4",
+        "redaxo/php-cs-fixer-config": "^2.19.0"
+    },
+
+    "autoload": {
+        "classmap": [
+            "lib/"
+        ]
+    },
+
+    "scripts": {
+        "cs": "php-cs-fixer fix -v --ansi",
+        "post-update-cmd": "@composer bump"
+    },
+
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "platform": {
+            "php": "8.1.16"
+        }
+    }
+}

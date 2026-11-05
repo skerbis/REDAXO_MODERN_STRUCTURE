@@ -1,0 +1,890 @@
+/**
+ * MForm FlexRepeater – CSS
+ * Modernes UI mit Bootstrap-Integration, Drag-and-Drop-Feedback und Dark-Mode-Support.
+ */
+
+/* ============================================================
+   CSS-Variablen (Light-Mode Defaults)
+   ============================================================ */
+:root {
+    --mfr-bg:              var(--mform-surface);
+    --mfr-bg-header:       var(--mform-surface-alt);
+    --mfr-bg-header-hover: var(--mform-hover);
+    --mfr-border:          var(--mform-border);
+    --mfr-border-radius:   var(--mform-radius-lg);
+    --mfr-shadow:          var(--mform-shadow);
+    --mfr-shadow-hover:    var(--mform-shadow-lift);
+    --mfr-color-text:      var(--mform-text);
+    --mfr-color-muted:     var(--mform-muted);
+    --mfr-drag-handle:     var(--mform-muted);
+    --mfr-drag-cursor:     grab;
+    --mfr-ghost-bg:        var(--mform-active-bg);
+    --mfr-ghost-border:    var(--mform-link);
+    --mfr-chosen-shadow:   var(--mform-shadow-lift);
+    --mfr-nested-bg:       var(--mform-surface-alt);
+    --mfr-nested-border:   var(--mform-border);
+    --mfr-flash-bg:        var(--mform-active-bg);
+    --mfr-flash-border:    var(--mform-link);
+    --mfr-disabled-bg:          #f5f5f5;
+    --mfr-disabled-border:       #d0d0d0;
+    --mfr-disabled-accent:       #9e9e9e;
+    --mfr-disabled-text:         #888;
+    --mfr-disabled-badge-bg:     #9e9e9e;
+    --mfr-disabled-badge-text:   #fff;
+    --mfr-disabled-body-opacity: 0.45;
+    --mfr-active-accent:         var(--mform-success);
+    --mfr-add-mt:          .75rem;
+    --mfr-item-gap:        .75rem;
+    --mfr-transition:      150ms ease;
+}
+
+/* ============================================================
+   Dark-Mode – explizit (body.rex-theme-dark)
+   ============================================================ */
+body.rex-theme-dark {
+    --mfr-bg:              var(--mform-surface);
+    --mfr-bg-header:       var(--mform-surface-alt);
+    --mfr-bg-header-hover: var(--mform-hover);
+    --mfr-border:          var(--mform-border);
+    --mfr-color-text:      var(--mform-text);
+    --mfr-color-muted:     var(--mform-muted);
+    --mfr-drag-handle:     var(--mform-muted);
+    --mfr-ghost-bg:        var(--mform-active-bg);
+    --mfr-ghost-border:    var(--mform-link);
+    --mfr-nested-bg:       var(--mform-surface-alt);
+    --mfr-nested-border:   var(--mform-border);
+    --mfr-flash-bg:        var(--mform-active-bg);
+    --mfr-flash-border:    var(--mform-link);
+    --mfr-disabled-bg:          #2a2a2a;
+    --mfr-disabled-border:       #555;
+    --mfr-disabled-accent:       #777;
+    --mfr-disabled-text:         #888;
+    --mfr-disabled-badge-bg:     #666;
+    --mfr-disabled-badge-text:   #fff;
+    --mfr-disabled-body-opacity: 0.4;
+    --mfr-active-accent:         var(--mform-success);
+    --mfr-shadow:          var(--mform-shadow);
+    --mfr-shadow-hover:    var(--mform-shadow-lift);
+}
+
+/* Auto Dark-Mode (Systemeinstellung) */
+@media (prefers-color-scheme: dark) {
+    body.rex-has-theme:not(.rex-theme-light) {
+        --mfr-bg:              var(--mform-surface);
+        --mfr-bg-header:       var(--mform-surface-alt);
+        --mfr-bg-header-hover: var(--mform-hover);
+        --mfr-border:          var(--mform-border);
+        --mfr-color-text:      var(--mform-text);
+        --mfr-color-muted:     var(--mform-muted);
+        --mfr-drag-handle:     var(--mform-muted);
+        --mfr-ghost-bg:        var(--mform-active-bg);
+        --mfr-ghost-border:    var(--mform-link);
+        --mfr-nested-bg:       var(--mform-surface-alt);
+        --mfr-nested-border:   var(--mform-border);
+        --mfr-flash-bg:        var(--mform-active-bg);
+        --mfr-flash-border:    var(--mform-link);
+        --mfr-disabled-bg:          #2a2a2a;
+        --mfr-disabled-border:       #555;
+        --mfr-disabled-accent:       #777;
+        --mfr-disabled-text:         #888;
+        --mfr-disabled-badge-bg:     #666;
+        --mfr-disabled-badge-text:   #fff;
+        --mfr-disabled-body-opacity: 0.4;
+        --mfr-active-accent:         var(--mform-success);
+        --mfr-shadow:          var(--mform-shadow);
+        --mfr-shadow-hover:    var(--mform-shadow-lift);
+    }
+}
+
+/* ============================================================
+   Container
+   ============================================================ */
+.mfr-container {
+    position: relative;
+}
+
+/* Kopfzeile: Label + Anzahl links, Aktionen rechts */
+.mfr-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: .5rem .75rem;
+    margin-bottom: .55rem;
+}
+
+.mfr-label {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    font-weight: 600;
+    text-align: left;
+    color: var(--mfr-color-text);
+}
+
+.mfr-count {
+    display: inline-block;
+    min-width: 1.6em;
+    padding: 2px 7px;
+    border: 1px solid var(--mfr-border);
+    border-radius: 999px;
+    background: var(--mfr-bg-header);
+    color: var(--mfr-color-muted);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.mfr-count:empty {
+    display: none;
+}
+
+/* ============================================================
+   Items-Liste
+   ============================================================ */
+.mfr-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mfr-item-gap);
+    min-height: 0;
+}
+
+.mfr-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-top: var(--mfr-add-mt);
+}
+
+.mfr-toolbar .btn-group {
+    flex-shrink: 0;
+}
+
+.mfr-toolbar-top {
+    margin: 0 0 0 auto;
+}
+
+.mfr-toolbar-top .btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.mfr-toolbar-top .mfr-btn-toggle-all {
+    color: var(--mfr-color-muted);
+}
+
+.mfr-toolbar-top .mfr-btn-toggle-all:hover,
+.mfr-toolbar-top .mfr-btn-toggle-all:focus {
+    color: var(--mfr-color-text);
+}
+
+/* Unten: durchgehender Hinzufuegen-Streifen als Abschluss der Liste */
+.mfr-toolbar-bottom {
+    margin-top: var(--mfr-add-mt);
+}
+
+.mfr-toolbar .mfr-btn-add {
+    margin-top: 0;
+}
+
+.mfr-toolbar-bottom .mfr-btn-add {
+    flex: 1 1 auto;
+}
+
+.mfr-toolbar-bottom .mfr-btn-add.btn-primary,
+.mfr-toolbar-bottom .mfr-btn-add.btn-default,
+.mfr-btn-add-nested {
+    display: block;
+    width: 100%;
+    padding: .5rem 1rem;
+    background: transparent;
+    border: 1px dashed var(--mfr-border);
+    border-radius: var(--mfr-border-radius);
+    box-shadow: none;
+    color: var(--mform-link);
+    font-weight: 600;
+    text-shadow: none;
+    transition: background var(--mfr-transition), border-color var(--mfr-transition);
+}
+
+.mfr-toolbar-bottom .mfr-btn-add.btn-primary:hover,
+.mfr-toolbar-bottom .mfr-btn-add.btn-primary:focus,
+.mfr-toolbar-bottom .mfr-btn-add.btn-default:hover,
+.mfr-toolbar-bottom .mfr-btn-add.btn-default:focus,
+.mfr-btn-add-nested:hover,
+.mfr-btn-add-nested:focus {
+    background: var(--mform-active-bg);
+    border-style: solid;
+    border-color: var(--mform-link);
+    color: var(--mform-link);
+    outline: none;
+}
+
+.mfr-toolbar-bottom .mfr-btn-add.btn-primary:active,
+.mfr-toolbar-bottom .mfr-btn-add.btn-default:active,
+.mfr-btn-add-nested:active {
+    background: var(--mform-active-bg);
+    box-shadow: none;
+}
+
+.mfr-toolbar-bottom .mfr-btn-paste,
+.mfr-toolbar-bottom .mfr-btn-clipboard-clear {
+    flex: 0 0 auto;
+}
+
+/* ============================================================
+   Einzelnes Item
+   ============================================================ */
+.mfr-item {
+    background: var(--mfr-bg);
+    border: 1px solid var(--mfr-border);
+    border-left: 4px solid var(--mfr-active-accent);
+    border-radius: var(--mfr-border-radius);
+    box-shadow: var(--mfr-shadow);
+    transition: box-shadow var(--mfr-transition), border-color var(--mfr-transition);
+    overflow: hidden;
+}
+
+.mfr-item:hover {
+    box-shadow: var(--mfr-shadow-hover);
+}
+
+.mfr-item.mfr-item-disabled {
+    border-style: solid;
+    border-color: var(--mfr-disabled-border);
+    border-left: 4px solid var(--mfr-disabled-accent);
+    background: var(--mfr-disabled-bg);
+}
+
+.mfr-item.mfr-item-disabled .mfr-item-header {
+    background: var(--mfr-bg-header);
+}
+
+.mfr-item.mfr-item-disabled .mfr-item-title {
+    color: var(--mfr-disabled-text);
+    font-style: italic;
+}
+
+/* Status-Punkt im Header (grün = online, rot = offline) */
+.mfr-status-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: .5em;
+    flex-shrink: 0;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+}
+
+.mfr-status-dot--online {
+    background: var(--mfr-active-accent);
+    box-shadow: 0 0 0 2px rgba(39, 174, 96, .25);
+}
+
+.mfr-status-dot--offline {
+    background: #e74c3c;
+    box-shadow: 0 0 0 2px rgba(231, 76, 60, .25);
+}
+
+@keyframes mfrFlashIn {
+    0% {
+        background-color: var(--mfr-flash-bg);
+        border-color: var(--mfr-flash-border);
+    }
+    100% {
+        background-color: var(--mfr-bg);
+        border-color: var(--mfr-border);
+    }
+}
+
+.mfr-item.mfr-item-flash,
+.mfr-nested-item.mfr-item-flash {
+    animation: mfrFlashIn .9s ease-out;
+}
+
+@keyframes mfrDeleteOut {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(.985);
+    }
+}
+
+.mfr-item.mfr-item-removing,
+.mfr-nested-item.mfr-item-removing {
+    animation: mfrDeleteOut .18s ease-in forwards;
+    pointer-events: none;
+}
+
+.mfr-item + .mfr-item {
+    margin-top: .15rem;
+}
+
+.mfr-item:has(.open),
+.mfr-nested-item:has(.open),
+.mfr-item:has(.dropdown-menu.show),
+.mfr-nested-item:has(.dropdown-menu.show) {
+    overflow: visible;
+}
+
+/* --- Header --- */
+.mfr-item-header {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .6rem .85rem;
+    background: var(--mfr-bg-header);
+    border-bottom: 1px solid var(--mfr-border);
+    cursor: default;
+    user-select: none;
+    min-height: 44px;
+    transition: background var(--mfr-transition);
+}
+
+.mfr-item-header:hover {
+    background: var(--mfr-bg-header-hover);
+}
+
+/* Drag-Handle */
+.mfr-item-drag {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--mfr-drag-handle);
+    cursor: var(--mfr-drag-cursor);
+    font-size: 14px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: color var(--mfr-transition);
+    flex-shrink: 0;
+}
+
+.mfr-item-drag:hover {
+    color: var(--mfr-color-text);
+}
+
+.mfr-item-drag:active {
+    cursor: grabbing;
+}
+
+/* Titel */
+.mfr-item-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--mfr-color-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Konfigurierte Ueberschrift (item_title): wie eine Reiter-Beschriftung, nicht ausgegraut */
+.mfr-item-title.mfr-title--custom,
+.mfr-nested-title.mfr-title--custom {
+    color: var(--mfr-color-text);
+}
+
+/* Aktions-Buttons */
+.mfr-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.mfr-item-actions .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    min-height: 26px;
+    padding: 3px 8px;
+    font-size: 12px;
+    line-height: 1;
+    border-radius: var(--mform-radius);
+    background: var(--mform-surface-alt);
+    border-color: var(--mform-border);
+    color: var(--mform-text);
+    transition: opacity var(--mfr-transition), background-color var(--mfr-transition), border-color var(--mfr-transition), color var(--mfr-transition);
+}
+
+.mfr-nested-actions .btn {
+    background: var(--mform-surface-alt);
+    border-color: var(--mform-border);
+    color: var(--mform-text);
+}
+
+.mfr-item-actions .btn.btn-danger,
+.mfr-nested-actions .btn.btn-danger {
+    background: var(--mform-surface-alt);
+    border-color: var(--mform-border);
+    color: var(--mform-danger);
+}
+
+.mfr-item-actions .btn.btn-danger:hover,
+.mfr-item-actions .btn.btn-danger:focus,
+.mfr-nested-actions .btn.btn-danger:hover,
+.mfr-nested-actions .btn.btn-danger:focus {
+    background: var(--mform-hover);
+    border-color: var(--mform-border-strong);
+    color: var(--mform-danger);
+}
+
+.mfr-item-actions .btn:not(.btn-danger):hover,
+.mfr-item-actions .btn:not(.btn-danger):focus,
+.mfr-nested-actions .btn:not(.btn-danger):hover,
+.mfr-nested-actions .btn:not(.btn-danger):focus {
+    background: var(--mform-hover);
+    border-color: var(--mform-border-strong);
+    color: var(--mform-text);
+}
+
+/* --- Body --- */
+.mfr-item-body {
+    padding: 1.6rem 1.9rem 1.6rem;
+}
+
+.mfr-item-body .form-group:last-child {
+    margin-bottom: 0;
+}
+
+/* ============================================================
+   "Hinzufügen"-Button
+   ============================================================ */
+.mfr-btn-add {
+    margin-top: var(--mfr-add-mt);
+}
+
+/* ============================================================
+   Drag-and-Drop-Zustände (SortableJS)
+   ============================================================ */
+.mfr-item-ghost {
+    opacity: .4;
+    background: var(--mfr-ghost-bg) !important;
+    border: 2px dashed var(--mfr-ghost-border) !important;
+    box-shadow: none !important;
+}
+
+.mfr-item-chosen {
+    box-shadow: var(--mfr-chosen-shadow) !important;
+}
+
+.mfr-item-dragging {
+    opacity: .95;
+    box-shadow: var(--mfr-chosen-shadow) !important;
+}
+
+/* ============================================================
+   Nested Repeater (Level 2)
+   ============================================================ */
+.mfr-nested-repeater {
+    background: var(--mfr-nested-bg);
+    border: 1px solid var(--mfr-nested-border);
+    border-radius: var(--mfr-border-radius);
+    padding: .85rem;
+    margin-top: .65rem;
+}
+
+/* Einleitender Text (Option description) */
+.mfr-description {
+    margin: -.2rem 0 .65rem;
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--mfr-color-muted);
+}
+
+.mfr-description.mfr-nested-description {
+    margin: -.25rem 0 .5rem;
+    font-size: 12px;
+}
+
+.mfr-nested-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mfr-color-muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: .5rem;
+}
+
+.mfr-nested-items {
+    display: flex;
+    flex-direction: column;
+    gap: .45rem;
+    margin-bottom: .6rem;
+}
+
+.mfr-nested-item {
+    background: var(--mfr-bg);
+    border: 1px solid var(--mfr-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.mfr-nested-header {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .45rem .65rem;
+    background: var(--mfr-bg-header);
+    border-bottom: 1px solid var(--mfr-border);
+    cursor: default;
+    user-select: none;
+    min-height: 36px;
+}
+
+.mfr-nested-drag {
+    color: var(--mfr-drag-handle);
+    cursor: var(--mfr-drag-cursor);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.mfr-nested-title {
+    flex: 1;
+    font-size: 12px;
+    color: var(--mfr-color-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mfr-nested-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
+.mfr-nested-actions .btn {
+    min-width: 28px;
+    min-height: 24px;
+    padding: 2px 7px;
+}
+
+.mfr-nested-body {
+    padding: .8rem .9rem .9rem;
+}
+
+.mfr-nested-body .form-group:last-child {
+    margin-bottom: 0;
+}
+
+.mfr-btn-add-nested {
+    margin-top: .5rem;
+    padding: .4rem .9rem;
+    font-size: 12px;
+}
+
+.mfr-nested-items:empty + .mfr-btn-add-nested {
+    margin-top: 0;
+}
+
+.mfr-container .mfr-btn-add-after,
+.mfr-container .mfr-btn-nested-add-after {
+    color: #2a7f45;
+}
+
+.mfr-container .mfr-btn-add-after:hover,
+.mfr-container .mfr-btn-nested-add-after:hover {
+    color: #1f6135;
+}
+
+body.rex-theme-dark .mfr-item-actions .mfr-btn-add-after,
+body.rex-theme-dark .mfr-item-actions .mfr-btn-nested-add-after,
+body.rex-theme-dark .mfr-nested-actions .mfr-btn-add-after,
+body.rex-theme-dark .mfr-nested-actions .mfr-btn-nested-add-after {
+    color: #63dd88;
+}
+
+body.rex-theme-dark .mfr-item-actions .mfr-btn-add-after:hover,
+body.rex-theme-dark .mfr-item-actions .mfr-btn-nested-add-after:hover,
+body.rex-theme-dark .mfr-nested-actions .mfr-btn-add-after:hover,
+body.rex-theme-dark .mfr-nested-actions .mfr-btn-nested-add-after:hover {
+    color: #8ef0ad;
+}
+
+/* Copy button */
+.mfr-container .mfr-btn-copy {
+    color: #5b8fc7;
+}
+
+.mfr-container .mfr-btn-copy:hover {
+    color: #3a6ea8;
+}
+
+.mfr-container .mfr-btn-copy-active {
+    color: #fff !important;
+    background-color: #5b8fc7 !important;
+    border-color: #3a6ea8 !important;
+}
+
+.mfr-container .mfr-btn-clipboard-clear {
+    color: #a94442;
+}
+
+.mfr-copy-off-icon {
+    position: relative;
+    display: inline-block;
+    line-height: 1;
+}
+
+.mfr-copy-off-icon .mfr-copy-off-x {
+    position: absolute;
+    right: -4px;
+    top: -4px;
+    font-size: 10px;
+}
+
+.mfr-container .mfr-btn-clipboard-clear:hover {
+    color: #843534;
+}
+
+/* Paste button in toolbar – margin handled by btn-group */
+
+/* Dark mode copy button */
+body.rex-theme-dark .mfr-container .mfr-btn-copy {
+    color: #7fb3e8;
+}
+
+body.rex-theme-dark .mfr-container .mfr-btn-copy:hover {
+    color: #a9d6ff;
+}
+
+body.rex-theme-dark .mfr-container .mfr-btn-clipboard-clear:hover {
+    color: #ffb3b3;
+}
+
+@media (prefers-color-scheme: dark) {
+    body.rex-has-theme:not(.rex-theme-light) .mfr-item-actions .mfr-btn-add-after,
+    body.rex-has-theme:not(.rex-theme-light) .mfr-item-actions .mfr-btn-nested-add-after,
+    body.rex-has-theme:not(.rex-theme-light) .mfr-nested-actions .mfr-btn-add-after,
+    body.rex-has-theme:not(.rex-theme-light) .mfr-nested-actions .mfr-btn-nested-add-after {
+        color: #63dd88;
+    }
+
+    body.rex-has-theme:not(.rex-theme-light) .mfr-item-actions .mfr-btn-add-after:hover,
+    body.rex-has-theme:not(.rex-theme-light) .mfr-item-actions .mfr-btn-nested-add-after:hover,
+    body.rex-has-theme:not(.rex-theme-light) .mfr-nested-actions .mfr-btn-add-after:hover,
+    body.rex-has-theme:not(.rex-theme-light) .mfr-nested-actions .mfr-btn-nested-add-after:hover {
+        color: #8ef0ad;
+    }
+
+    body.rex-has-theme:not(.rex-theme-light) .mfr-container .mfr-btn-copy:hover {
+        color: #a9d6ff;
+    }
+
+    body.rex-has-theme:not(.rex-theme-light) .mfr-container .mfr-btn-clipboard-clear:hover {
+        color: #ffb3b3;
+    }
+
+    body.rex-has-theme:not(.rex-theme-light) .mfr-container .mfr-btn-copy {
+        color: #7fb3e8;
+    }
+}
+
+body.rex-theme-dark .mfr-container .mfr-btn-clipboard-clear {
+    color: #f08a8a;
+}
+
+@media (prefers-color-scheme: dark) {
+    body.rex-has-theme:not(.rex-theme-light) .mfr-container .mfr-btn-clipboard-clear {
+        color: #f08a8a;
+    }
+}
+
+/* Nested Drag-Feedback */
+.mfr-nested-items .mfr-item-ghost {
+    opacity: .35;
+}
+
+/* ============================================================
+   Radio / Checkbox im Repeater-Body
+   ============================================================ */
+.mfr-item-body .radio,
+.mfr-nested-body .radio {
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.mfr-item-body .radio:first-child,
+.mfr-nested-body .radio:first-child {
+    margin-top: 0;
+}
+
+.mfr-item-body .radio:last-child,
+.mfr-nested-body .radio:last-child {
+    margin-bottom: 0;
+}
+
+.mfr-radio-group,
+.mfr-checkbox-inline-group {
+    padding-top: 4px;
+}
+
+.mfr-checkbox-inline-group .checkbox-inline {
+    padding-top: 0;
+}
+
+.mfr-checkbox-inline-group .checkbox-inline + .checkbox-inline {
+    margin-left: 10px;
+}
+
+.mfr-item-body .checkbox,
+.mfr-nested-body .checkbox {
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+/* ============================================================
+   Template-spezifische Elemente im Item-Body
+   ============================================================ */
+.mfr-template-headline h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--mfr-color-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin: .75rem 0 .25rem;
+    padding-bottom: .25rem;
+    border-bottom: 1px solid var(--mfr-border);
+}
+
+.mfr-template-description p {
+    font-size: 12px;
+    color: var(--mfr-color-muted);
+    margin-bottom: .4rem;
+}
+
+/* ============================================================
+   Feldgruppen im Repeater
+   Default-Layout: Bootstrap-3 form-horizontal (Label col-sm-3 /
+   Feld col-sm-9). Layout per Container ueber data-mfr-layout
+   steuerbar:
+   - horizontal (default)  Label links / Feld rechts (col-sm-*)
+   - vertical              Label oben / Feld unten (col-sm-12)
+   - inline                Label oben kompakt / Feld unten
+   Spaltenbreite optional via attribute label_width => '<n>'
+   (n in 1..11) auf addRepeaterElement(...).
+   ============================================================ */
+.mfr-field-group {
+    margin-bottom: .75rem;
+}
+
+/* Label-Spalte ueber .mfr-field-label ansprechen, nicht ueber .control-label:
+   setFull()-Felder haben (wie im klassischen Parser) kein .control-label, siehe #460. */
+.mfr-item-body.form-horizontal .mfr-field-group .mfr-field-label,
+.mfr-nested-body.form-horizontal .mfr-field-group .mfr-field-label {
+    overflow-wrap: anywhere;
+}
+
+/* Vertical / Inline Layout: Label oben, Feld darunter, volle Breite. */
+.mfr-container[data-mfr-layout="vertical"] .mfr-field-group > .mfr-field-label,
+.mfr-container[data-mfr-layout="vertical"] .mfr-field-group > .mfr-field-col,
+.mfr-container[data-mfr-layout="inline"] .mfr-field-group > .mfr-field-label,
+.mfr-container[data-mfr-layout="inline"] .mfr-field-group > .mfr-field-col {
+    float: none;
+    width: 100%;
+    text-align: left;
+    padding-top: 0;
+}
+
+.mfr-container[data-mfr-layout="vertical"] .mfr-field-group > .mfr-field-label,
+.mfr-container[data-mfr-layout="inline"] .mfr-field-group > .mfr-field-label {
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+
+.mfr-container[data-mfr-layout="inline"] .mfr-field-group {
+    margin-bottom: .4rem;
+}
+.mfr-container[data-mfr-layout="inline"] .mfr-field-group > .mfr-field-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mfr-color-muted);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+/* ============================================================
+   Fieldset / Collapse / Modal-Buttons im Repeater-Body
+   ============================================================ */
+.mfr-item-body fieldset,
+.mfr-nested-body fieldset {
+    border: 1px solid var(--mfr-border);
+    border-radius: var(--mfr-border-radius);
+    padding: .65rem .9rem .15rem;
+    margin: .25rem 0 .85rem;
+    min-width: 0;
+}
+
+.mfr-item-body fieldset > legend,
+.mfr-nested-body fieldset > legend {
+    width: auto;
+    padding: 0 .5rem;
+    margin-bottom: 0;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    color: var(--mfr-color-muted);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.mfr-item-body > .btn-white.btn-block,
+.mfr-nested-body > .btn-white.btn-block,
+.mfr-item-body .collapse-group > .btn-white.btn-block,
+.mfr-nested-body .collapse-group > .btn-white.btn-block {
+    margin-bottom: .5rem;
+}
+
+.mfr-item-body > .collapse,
+.mfr-nested-body > .collapse,
+.mfr-item-body > .collapse-group,
+.mfr-nested-body > .collapse-group {
+    margin-bottom: .5rem;
+}
+
+/* ============================================================
+   Zugeklappt-Zustand: sanfte Transition
+   ============================================================ */
+.mfr-item-body,
+.mfr-nested-body {
+    transition: none; /* overflow-Hack für einfaches show/hide */
+}
+
+/* ============================================================
+   Leer-Zustand (keine Items)
+   ============================================================ */
+/* Platzhalter nur, wenn ein Text gesetzt ist; sonst ist der Hinzufuegen-Streifen der Leerzustand */
+.mfr-items-list[data-empty-text]:empty::after {
+    content: attr(data-empty-text);
+    display: block;
+    text-align: center;
+    padding: 1.5rem;
+    font-size: 13px;
+    color: var(--mfr-color-muted);
+    border: 2px dashed var(--mfr-border);
+    border-radius: var(--mfr-border-radius);
+}
+
+/* ============================================================
+   Responsive: auf kleinen Screens Buttons in Menü kollabieren
+   ============================================================ */
+@media (max-width: 480px) {
+    .mfr-item-actions .btn-xs {
+        padding: 2px 5px;
+    }
+    .mfr-item-title {
+        max-width: 120px;
+    }
+}

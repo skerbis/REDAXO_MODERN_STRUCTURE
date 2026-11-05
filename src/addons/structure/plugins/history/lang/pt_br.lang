@@ -1,0 +1,14 @@
+structure_history = História
+structure_history_title_info = Explicação curta
+structure_history_snapshot_reactivate = Reverter para essa versão
+structure_history_snapshot_reactivated = Versão foi revertida
+structure_history_overview_versions = Panorama da história
+structure_history_current_version = Versão atual
+structure_history_info_content = <p> O PlugIn história grava todas as alterações feitas em um produto e cria snapshots que podem ser utilizados posteriormente para restaurar um status anterior de produto específico. <p>
+
+perm_options_history[article_rollback] = Restaurar produto (história)
+
+structure_history_button_delete_history = Deletar todos os snapshots do História
+structure_history_deleted = Todos os snapshots foram deletados
+structure_history_savedby = Salvo por
+structure_history_close = Fechar

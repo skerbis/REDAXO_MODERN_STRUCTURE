@@ -1,0 +1,365 @@
+<?php
+
+/**
+ * REX_CUSTOM_LINK.
+ *
+ * Attribute:
+ *   - category  => Kategorie in die beim oeffnen der Linkmapw gesprungen werden soll
+ *
+ * @package redaxo\structure
+ */
+class rex_var_custom_link extends rex_var
+{
+    /**
+     * @return string
+     * @author Joachim Doerr
+     */
+    public static function getCustomLinkText(mixed $value): string
+    {
+        $valueString = (is_scalar($value) || null === $value) ? (string) $value : '';
+        $valueName = $valueString;
+        if (file_exists(rex_path::media($valueString))) {
+            // do nothing
+        } elseif (false === filter_var($valueString, FILTER_VALIDATE_URL) && is_numeric($valueString)) {
+            // article by plain numeric ID (e.g. "14")
+            $art = rex_article::get((int) $valueString);
+            if ($art instanceof rex_article) {
+                $valueName = trim(sprintf('%s [%s]', $art->getName(), $art->getId()));
+            }
+        } elseif (1 === preg_match('/^redaxo:\/\/(\d+)$/', $valueString, $m)) {
+            // article by redaxo://ID format
+            $art = rex_article::get((int) $m[1]);
+            if ($art instanceof rex_article) {
+                $valueName = trim(sprintf('%s [%s]', $art->getName(), $art->getId()));
+            }
+        } elseif (1 === preg_match('/^(rex-[a-z0-9-]+):\/\/(\d+)$/i', $valueString, $m)) {
+            $valueName = self::getCustomLinkYFormDatasetText($valueString, $m[1], (int) $m[2]);
+        }
+        $valueName = (string) rex_extension::registerPoint(
+            new rex_extension_point('mform/varCustomLink.getCustomLinkText', $valueName, [
+                'value' => $valueString,
+            ]),
+        );
+        return $valueName;
+    }
+
+    /**
+     * @param null $name
+     * @throws rex_sql_exception
+     * @return string
+     * @author Joachim Doerr
+     */
+    public static function getCustomLinkYFormLinkText(string $value, string $table, string $column, ?string $name = null): string
+    {
+        $valueName = $value;
+
+        if (1 === preg_match('@(rex-.*)://(\d+)@i', $value, $matches, PREG_OFFSET_CAPTURE, 0)) {
+            $matchedTable = (string) $matches[1][0];
+            $matchedId = (string) $matches[2][0];
+
+            if ($matchedTable === str_replace('_', '-', $table) && ctype_digit($matchedId)) {
+                $sql = rex_sql::factory();
+                $result = $sql->getArray("select $column from $table where id=:id", ['id' => $matchedId]);
+                if (isset($result[0][$column])) {
+                    $valueName = trim((string) $result[0][$column]) . ' [id=' . $matchedId . ']';
+                }
+            }
+        }
+
+        return $valueName;
+    }
+
+    /**
+     * @param array<int, string>|string|null $labelColumns
+     * @return array<int, string>
+     */
+    public static function normalizeLabelColumns(array|string|null $labelColumns): array
+    {
+        if (is_string($labelColumns)) {
+            $labelColumns = array_map('trim', explode('|', $labelColumns));
+        }
+
+        if (!is_array($labelColumns)) {
+            return [];
+        }
+
+        $normalizedColumns = [];
+        foreach ($labelColumns as $column) {
+            $column = trim($column);
+            if ('' !== $column) {
+                $normalizedColumns[] = $column;
+            }
+        }
+
+        return array_values(array_unique($normalizedColumns));
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<int, string> $labelColumns
+     */
+    public static function resolveCustomLinkLabelFromRow(array $row, array $labelColumns): string
+    {
+        $parts = [];
+        foreach ($labelColumns as $column) {
+            if (!isset($row[$column])) {
+                continue;
+            }
+
+            $value = trim((string) $row[$column]);
+            if ('' !== $value) {
+                $parts[] = $value;
+            }
+        }
+
+        return trim(implode(' ', $parts));
+    }
+
+    public static function getCustomLinkYFormDatasetText(string $fallbackValue, string $tableScheme, int $id): string
+    {
+        return self::getCustomLinkYFormDatasetTextByColumns($fallbackValue, $tableScheme, $id, []);
+    }
+
+    /**
+     * @param array<int, string>|string|null $labelColumns
+     */
+    public static function getCustomLinkYFormDatasetTextByColumns(string $fallbackValue, string $tableScheme, int $id, array|string|null $labelColumns = null): string
+    {
+        $table = str_replace('-', '_', strtolower($tableScheme));
+        $normalizedLabelColumns = self::normalizeLabelColumns($labelColumns);
+
+        try {
+            $sql = rex_sql::factory();
+            $rows = $sql->getArray(
+                'SELECT * FROM ' . $sql->escapeIdentifier($table) . ' WHERE id = :id LIMIT 1',
+                ['id' => $id],
+            );
+        } catch (rex_sql_exception) {
+            return $fallbackValue;
+        }
+
+        if (!isset($rows[0])) {
+            return $fallbackValue;
+        }
+
+        $row = $rows[0];
+        $label = self::resolveCustomLinkLabelFromRow($row, $normalizedLabelColumns);
+
+        if ('' === $label) {
+            $label = trim(implode(' ', array_filter([
+                trim((string) ($row['name'] ?? '')),
+                trim((string) ($row['surname'] ?? '')),
+            ])));
+        }
+
+        if ('' === $label) {
+            foreach (['title', 'label', 'headline', 'bezeichnung'] as $column) {
+                if (isset($row[$column]) && is_string($row[$column]) && '' !== trim($row[$column])) {
+                    $label = trim($row[$column]);
+                    break;
+                }
+            }
+        }
+
+        if ('' === $label) {
+            return $fallbackValue;
+        }
+
+        return sprintf('%s [id=%d]', $label, $id);
+    }
+
+    /**
+     * @return bool|string
+     * @author Joachim Doerr
+     */
+    protected function getOutput()
+    {
+        $id = $this->getArg('id', 0, true);
+        if (!in_array($this->getContext(), ['module', 'action']) || !is_numeric($id) || $id < 1 || $id > 10) {
+            return false;
+        }
+
+        $value = $this->getContextData()->getValue('value' . $id);
+
+        if ($this->hasArg('isset') && $this->getArg('isset')) {
+            return $value ? 'true' : 'false';
+        }
+
+        if ($this->hasArg('widget') && $this->getArg('widget')) {
+            if (!$this->environmentIs(self::ENV_INPUT)) {
+                return false;
+            }
+
+            $args = [];
+            foreach (['category', 'media', 'media_category', 'types', 'preview', 'external', 'mailto', 'intern', 'phone', 'anchor', 'external_prefix', 'ylink'] as $key) {
+                if ($this->hasArg($key)) {
+                    $args[$key] = $this->getArg($key);
+                }
+            }
+
+            $value = self::getWidget($id, 'REX_INPUT_VALUE[' . $id . ']', $value, $args);
+        } else {
+            if ($value && $this->hasArg('output') && 'id' != $this->getArg('output')) {
+                $value = rex_getUrl($value);
+            }
+        }
+
+        return self::quote($value);
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    public static function prepareYLinkArg(array $args): array
+    {
+        if (isset($args['ylink']) && is_string($args['ylink']) && '' !== $args['ylink']) {
+            $ylinks = array_filter(explode(',', $args['ylink']));
+            $args['ylink'] = [];
+            foreach ($ylinks as $ylink) {
+                $link = array_values(array_filter(explode('::', $ylink)));
+                if (!isset($link[0], $link[1], $link[2])) {
+                    continue;
+                }
+                $args['ylink'][] = [
+                    'name' => $link[0],
+                    'table' => $link[1],
+                    'column' => $link[2],
+                    'label_columns' => self::normalizeLabelColumns($link[3] ?? null),
+                ];
+            }
+        } elseif (isset($args['ylink']) && is_array($args['ylink'])) {
+            foreach ($args['ylink'] as $index => $ylink) {
+                if (!is_array($ylink)) {
+                    continue;
+                }
+
+                $args['ylink'][$index]['label_columns'] = self::normalizeLabelColumns($ylink['label_columns'] ?? null);
+            }
+        }
+        return $args;
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>
+     */
+    public static function normalizeMediaTypesArg(array $args): array
+    {
+        if (!isset($args['types']) && isset($args['data-types'])) {
+            $args['types'] = $args['data-types'];
+        }
+        if (!isset($args['types']) && isset($args['data-media-type'])) {
+            $args['types'] = $args['data-media-type'];
+        }
+
+        if (isset($args['types'])) {
+            $types = is_array($args['types']) ? implode(',', $args['types']) : (string) $args['types'];
+            $types = strtolower(str_replace(' ', '', $types));
+            $types = trim($types, ',');
+            $args['types'] = $types;
+        }
+
+        return $args;
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     */
+    public static function getWidget(int|string $id, string $name, mixed $value, array $args = [], bool $btnIdUniq = true): string
+    {
+        $args = self::normalizeMediaTypesArg($args);
+
+        $valueString = (is_scalar($value) || null === $value) ? (string) $value : '';
+        $valueName = self::getCustomLinkText($valueString);
+        $category = '';
+        $mediaCategory = '';
+        $types = '';
+
+        if (false === filter_var($valueString, FILTER_VALIDATE_URL) && is_numeric($valueString)) {
+            $art = rex_article::get((int) $valueString);
+            if ($art instanceof rex_article) {
+                $category = $art->getCategoryId();
+            }
+        }
+
+        $wdgtClass = ' rex-js-widget-customlink';
+
+        if (is_numeric($category) || isset($args['category']) && ($category = (int) $args['category'])) {
+            $category = ' data-category="' . $category . '"';
+        }
+        if (isset($args['media_category']) && ($mediaCategory = (int) $args['media_category'])) {
+            $mediaCategory = ' data-media_category="' . $mediaCategory . '"';
+        }
+        if (isset($args['types']) && ($types = $args['types'])) {
+            $types = ' data-types="' . $types . '"';
+        }
+        $class = '';
+        if (isset($args['class'])) {
+            $class = $args['class'];
+        }
+        $mediaClass = (isset($args['media']) && 0 == $args['media']) ? ' hidden' : $class;
+        // preview = 0/false blendet die Vorschau-Schaltflaeche aus (Standard: anzeigen, wenn die Datei eine Vorschau erlaubt)
+        $showPreview = !(isset($args['preview']) && in_array(strtolower(trim((string) $args['preview'])), ['0', 'false', 'no', 'off'], true));
+        $externalClass = (isset($args['external']) && 0 == $args['external']) ? ' hidden' : $class;
+        $emailClass = (isset($args['mailto']) && 0 == $args['mailto']) ? ' hidden' : $class;
+        $linkClass = (isset($args['intern']) && 0 == $args['intern']) ? ' hidden' : $class;
+        $phoneClass = (isset($args['phone']) && 0 == $args['phone']) ? ' hidden' : $class;
+        $anchorClass = (isset($args['anchor']) && 0 == $args['anchor']) ? ' hidden' : $class;
+        $externalPrefix = (isset($args['external_prefix']) && '' !== (string) $args['external_prefix']) ? (string) $args['external_prefix'] : 'https://';
+        $args = self::prepareYLinkArg($args);
+        $ylinks = '';
+
+        if (true === $btnIdUniq) {
+            $id = uniqid((string) $id);
+        }
+
+        if (isset($args['ylink']) && is_array($args['ylink']) && count($args['ylink']) > 0 && isset($args['ylink'][0]['name'])) {
+            foreach ($args['ylink'] as $link) {
+                if (is_array($link) && isset($link['name']) && isset($link['table']) && isset($link['column'])) {
+                    $ylinks .= '<li><a href="#" class="ylink" data-table="' . $link['table'] . '" data-column="' . $link['column'] . '" data-name="' . $link['name'] . '">' . $link['name'] . '</a></li>';
+
+                    if ('' !== $valueString && str_contains($valueString, str_replace('_', '-', $link['table']))) {
+                        if (isset($link['label_columns']) && is_array($link['label_columns']) && count($link['label_columns']) > 0) {
+                            $valueName = self::getCustomLinkYFormDatasetTextByColumns($valueString, str_replace('_', '-', $link['table']), (int) preg_replace('/^.*:\/\//', '', $valueString), $link['label_columns']);
+                        } else {
+                            $valueName = self::getCustomLinkYFormLinkText($valueString, $link['table'], $link['column']);
+                        }
+                    }
+                }
+            }
+            if ('' !== $ylinks) {
+                $ylinks = '<a class="btn btn-popup" href="#" data-toggle="dropdown"><i class="rex-icon fa-database"></i> <span class="caret"></span></a><ul id="mform_ylink_' . $id . '" class="dropdown-menu">' . $ylinks . '</ul>';
+            }
+        }
+
+        $e = [];
+        $e['field'] = '<input class="form-control" type="text" name="REX_LINK_NAME[' . $id . ']" value="' . rex_escape($valueName) . '" id="REX_LINK_' . $id . '_NAME" readonly="readonly" /><input type="hidden" name="' . $name . '" id="REX_LINK_' . $id . '" value="' . rex_escape($valueString) . '" />';
+        $e['before'] = '<div class="rex-js-widget custom-link' . $wdgtClass . '" data-widget-id="' . $id . '">';
+        $e['after'] = '</div>';
+        $e['functionButtons'] = $ylinks . ($showPreview ? '
+        <a href="#" class="btn btn-popup media_preview_link media_preview_link--leading hidden ' . $mediaClass . '" id="mform_media_preview_' . $id . '" title="' . rex_i18n::msg('var_media_view') . '"><i class="rex-icon fa-eye"></i></a>' : '') . '
+        <a href="#" class="btn btn-popup intern_link ' . $linkClass . '" id="mform_link_' . $id . '" title="' . rex_i18n::msg('var_link_open') . '"><i class="rex-icon rex-icon-open-linkmap"></i></a>
+        <a href="#" class="btn btn-popup external_link ' . $externalClass . '" id="mform_extern_' . $id . '" title="' . rex_i18n::msg('var_extern_link') . '"><i class="rex-icon fa-external-link"></i></a>
+        <a href="#" class="btn btn-popup media_link ' . $mediaClass . '" id="mform_media_' . $id . '" title="' . rex_i18n::msg('var_media_open') . '"><i class="rex-icon fa-file-o"></i></a>
+        <a href="#" class="btn btn-popup email_link ' . $emailClass . '" id="mform_mailto_' . $id . '" title="' . rex_i18n::msg('var_mailto_link') . '"><i class="rex-icon fa-envelope-o"></i></a>
+        <a href="#" class="btn btn-popup phone_link ' . $phoneClass . '" id="mform_tel_' . $id . '" title="' . rex_i18n::msg('var_phone_link') . '"><i class="rex-icon fa-phone"></i></a>
+        <a href="#" class="btn btn-popup anchor_link ' . $anchorClass . '" id="mform_anchor_' . $id . '" title="Anker zu Slice setzen"><i class="rex-icon fa-anchor"></i></a>
+        <a href="#" class="btn btn-popup delete_link ' . $class . '" id="mform_delete_' . $id . '" title="' . rex_i18n::msg('var_link_delete') . '"><i class="rex-icon rex-icon-delete-link"></i></a>
+        ';
+
+        $fragment = new rex_fragment();
+        $fragment->setVar('elements', [$e], false);
+
+        $anchorData = '';
+        if (isset($args['anchor']) && 0 != $args['anchor']) {
+            $anchorData = ' data-anchor="enable"';
+        }
+
+        return str_replace(
+            '<div class="input-group">',
+            '<div class="input-group custom-link" ' . $category . $types . $mediaCategory . $anchorData . ' data-extern-link-prefix="' . $externalPrefix . '" data-clang="' . rex_clang::getCurrentId() . '" data-id="' . $id . '">',
+            $fragment->parse('core/form/widget.php'),
+        );
+    }
+}

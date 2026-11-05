@@ -1,0 +1,44 @@
+<?php
+
+/**
+ * @author Joachim Doerr
+ * @package redaxo5
+ * @license MIT
+ */
+
+namespace FriendsOfRedaxo\MForm\Handler;
+
+use FriendsOfRedaxo\MForm\DTO\MFormItem;
+
+class MFormParameterHandler
+{
+    public static function addParameter(MFormItem $item, mixed $name, mixed $value): void
+    {
+        switch ($name) {
+            case 'label':
+                $item->setLabel($value);
+                break;
+            case 'full':
+                $item->setFull(true);
+                break;
+            case 'notice':
+                $item->setNotice((string) $value);
+                break;
+            default:
+                $item->parameter[$name] = $value;
+                break;
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $parameter
+     */
+    public static function addParameters(MFormItem $item, array $parameter): void
+    {
+        // is parameter an array
+        foreach ($parameter as $name => $value) {
+            // set parameter by setParameter method
+            self::addParameter($item, $name, $value);
+        }
+    }
+}

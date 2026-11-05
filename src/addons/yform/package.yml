@@ -1,0 +1,72 @@
+package: yform
+version: '5.0.2'
+license: MIT
+author: 'Jan Kristinus, Gregor Harlan'
+supportpage: 'https://github.com/yakamara/yform/issues'
+compile: 0
+
+page:
+    title: 'translate:yform'
+    pjax: false
+    icon: rex-icon rex-icon-module
+    subpages:
+        manager:
+            title: 'translate:yform_manager'
+            pjax: false
+            subpages:
+                table_edit: {title: translate:yform_manager_table_edit, perm: admin}
+                table_migrate: {title: translate:yform_manager_table_migrate, perm: admin}
+                tableset_export: {title: translate:yform_manager_tableset_export, perm: admin}
+                tableset_import: {title: translate:yform_manager_tableset_import, perm: admin}
+                table_field: {title: '', hidden: true, perm: admin}
+                data_edit: {title: '', hidden: true}
+                data_import: {title: '', hidden: true}
+        setup:
+            title: 'translate:setup'
+            perm: admin
+        docs:
+            title: 'translate:docs'
+            perm: admin[]
+            pjax: false
+            itemClass: pull-right
+            icon: rex-icon fa-info-circle
+        email:
+            title: 'translate:yform_email_templates'
+            perm: admin[]
+            pjax: true
+        rest:
+            title: 'translate:yform_rest'
+            pjax: true
+            perm: admin
+            subpages:
+                token: {title: translate:yform_rest_token}
+                access: {title: translate:yform_rest_token_access}
+
+stylesheets:
+    - yform.css
+    - popup.css
+
+requires:
+    redaxo: '^5.17.0'
+    php:
+        version: '^8.1'
+
+console_commands:
+    yform:test:            rex_command_yform_test
+    yform:test:list:       rex_command_yform_test_list
+    yform:test:doctor:     rex_command_yform_test_doctor
+    yform:test:tables:     rex_command_yform_test_tables
+    yform:test:table-read: rex_command_yform_test_table_read
+    yform:test:fields:     rex_command_yform_test_fields
+    yform:test:datasets:   rex_command_yform_test_datasets
+    yform:test:queries:    rex_command_yform_test_queries
+    yform:test:validators: rex_command_yform_test_validators
+    yform:test:actions:           rex_command_yform_test_actions
+    yform:test:extension-points:  rex_command_yform_test_extension_points
+    yform:test:authorization:     rex_command_yform_test_authorization
+    yform:test:cache:             rex_command_yform_test_cache
+    yform:test:field-types:       rex_command_yform_test_field_types
+    yform:test:e2e:               rex_command_yform_test_e2e
+
+installer_ignore:
+    - .tools

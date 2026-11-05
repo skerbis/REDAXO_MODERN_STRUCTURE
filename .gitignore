@@ -1,0 +1,16 @@
+# Laufzeitdaten
+/var/cache/*
+!/var/cache/.htaccess
+!/var/cache/.redaxo
+/var/log/*
+
+# Von REDAXO beim Installieren kopierte Assets
+/public/assets/addons/
+
+# Medien (bei Bedarf entfernen, wenn Medien versioniert werden sollen)
+/public/media/*
+!/public/media/.redaxo
+
+# Lokale Umgebung
+.env
+.DS_Store

@@ -1,0 +1,255 @@
+:root {
+    --mfl-bg: var(--mform-surface);
+    --mfl-border: var(--mform-border);
+    --mfl-muted: var(--mform-muted);
+    --mfl-item-bg: var(--mform-surface-alt);
+    --mfl-item-bg-hover: var(--mform-hover);
+    --mfl-item-selected: var(--mform-link);
+    --mfl-item-selected-bg: var(--mform-active-bg);
+}
+
+.mform-list-widget {
+    border: 1px solid var(--mfl-border);
+    border-radius: var(--mform-radius-lg);
+    background: var(--mfl-bg);
+    padding: .55rem;
+}
+
+.mform-list-widget .mform-list-shell {
+    margin-bottom: .5rem;
+}
+
+.mform-list-widget .mform-list-select {
+    display: none;
+}
+
+.mform-list-widget .mform-list-items {
+    list-style: none;
+    margin: 0;
+    padding: .35rem;
+    border: 1px solid var(--mfl-border);
+    border-radius: var(--mform-radius);
+    min-height: 84px;
+    max-height: 220px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+}
+
+.mform-list-widget.mform-list-widget-medialist.is-grid-view .mform-list-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: .45rem;
+}
+
+.mform-list-widget.is-empty .mform-list-items::before {
+    content: attr(data-empty);
+    color: var(--mfl-muted);
+    font-size: 12px;
+}
+
+.mform-list-widget .mform-list-items li {
+    padding: .35rem .5rem;
+    background: var(--mfl-item-bg);
+    border-radius: var(--mform-radius);
+    border: 1px solid transparent;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+}
+
+.mform-list-widget.mform-list-widget-medialist .mform-list-items li {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+}
+
+.mform-list-widget .mform-list-drag-handle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    color: var(--mfl-muted);
+    cursor: grab;
+    flex: 0 0 18px;
+}
+
+.mform-list-widget .mform-list-drag-handle:active {
+    cursor: grabbing;
+}
+
+.mform-list-widget .mform-list-sortable-ghost {
+    opacity: .55;
+}
+
+.mform-list-widget .mform-list-sortable-chosen {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .12);
+}
+
+.mform-list-widget.mform-list-widget-medialist .mform-list-item-media {
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--mfl-border);
+    border-radius: 4px;
+    background: #fff;
+    flex: 0 0 36px;
+    overflow: hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mform-list-widget.mform-list-widget-medialist .mform-list-item-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.mform-list-widget.mform-list-widget-medialist .mform-list-item-ext {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    color: var(--mfl-muted);
+    text-transform: uppercase;
+}
+
+.mform-list-widget.mform-list-widget-medialist .mform-list-item-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mform-list-widget.mform-list-widget-medialist[data-hide-label="1"] .mform-list-item-label {
+    display: none;
+}
+
+.mform-list-widget.mform-list-widget-medialist.is-grid-view .mform-list-items li {
+    white-space: normal;
+    min-height: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .45rem;
+    overflow-wrap: anywhere;
+}
+
+.mform-list-widget.mform-list-widget-medialist.is-grid-view .mform-list-item-media {
+    width: 100%;
+    height: 72px;
+    flex-basis: 72px;
+}
+
+.mform-list-widget.mform-list-widget-medialist.is-gallery-view .mform-list-items {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: .5rem;
+}
+
+.mform-list-widget.mform-list-widget-medialist.is-gallery-view .mform-list-items li {
+    min-height: 130px;
+}
+
+.mform-list-widget.mform-list-widget-medialist.is-gallery-view .mform-list-item-media {
+    height: 104px;
+    flex-basis: 104px;
+}
+
+.mform-list-widget.mform-list-widget-medialist.is-gallery-view .mform-list-item-label {
+    display: none;
+}
+
+.mform-list-widget.mform-list-widget-medialist.is-grid-view .mform-list-item-label {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+.mform-list-widget .mform-list-items li:hover {
+    background: var(--mfl-item-bg-hover);
+}
+
+.mform-list-widget .mform-list-items li.is-selected {
+    border-color: var(--mfl-item-selected);
+    background: var(--mfl-item-selected-bg);
+}
+
+/* ── Toolbar – horizontal (default) ── */
+.mform-list-widget .mform-list-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+
+.mform-list-widget .mform-list-toolbar .btn {
+    min-width: 32px;
+}
+
+/* ── Toolbar – vertical ── */
+.mform-list-widget[data-toolbar="vertical"] {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: .5rem;
+    padding: .5rem;
+}
+
+.mform-list-widget[data-toolbar="vertical"] .mform-list-shell {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-bottom: 0;
+}
+
+.mform-list-widget[data-toolbar="vertical"] .mform-list-items {
+    max-height: 320px;
+}
+
+.mform-list-widget[data-toolbar="vertical"] .mform-list-toolbar {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: .3rem;
+}
+
+.mform-list-widget[data-toolbar="vertical"] .mform-list-toolbar .btn {
+    width: 100%;
+    min-width: 36px;
+}
+
+.mform-list-widget .mform-list-toolbar .mform-list-btn[disabled],
+.mform-list-widget .mform-list-toolbar .mform-list-btn.is-disabled {
+    opacity: .55;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.mform-list-widget .mform-list-toolbar .mform-list-btn-view-toggle {
+    min-width: 32px;
+}
+
+body.rex-theme-dark {
+    --mfl-bg: var(--mform-surface);
+    --mfl-border: var(--mform-border);
+    --mfl-muted: var(--mform-muted);
+    --mfl-item-bg: var(--mform-surface-alt);
+    --mfl-item-bg-hover: var(--mform-hover);
+    --mfl-item-selected: var(--mform-link);
+    --mfl-item-selected-bg: var(--mform-active-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+    body.rex-has-theme:not(.rex-theme-light) {
+        --mfl-bg: var(--mform-surface);
+        --mfl-border: var(--mform-border);
+        --mfl-muted: var(--mform-muted);
+        --mfl-item-bg: var(--mform-surface-alt);
+        --mfl-item-bg-hover: var(--mform-hover);
+        --mfl-item-selected: var(--mform-link);
+        --mfl-item-selected-bg: var(--mform-active-bg);
+    }
+}

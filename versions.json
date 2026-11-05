@@ -1,0 +1,45 @@
+{
+  "redaxo": "5.21.6",
+  "addons": {
+    "developer": {
+      "repo": "FriendsOfREDAXO/developer",
+      "version": "3.9.3"
+    },
+    "focuspoint": {
+      "repo": "FriendsOfREDAXO/focuspoint",
+      "version": "4.2.4"
+    },
+    "api": {
+      "repo": "FriendsOfREDAXO/api",
+      "version": "1.3"
+    },
+    "mediaplace": {
+      "repo": "FriendsOfREDAXO/mediaplace",
+      "version": "2.7.1"
+    },
+    "mform": {
+      "repo": "FriendsOfREDAXO/mform",
+      "version": "10.0.6"
+    },
+    "quick_navigation": {
+      "repo": "FriendsOfREDAXO/quick_navigation",
+      "version": "9.3.1"
+    },
+    "url": {
+      "repo": "tbaddade/redaxo_url",
+      "version": "2.3.0"
+    },
+    "watson": {
+      "repo": "tbaddade/redaxo_watson",
+      "version": "2.3.1"
+    },
+    "yform": {
+      "repo": "yakamara/yform",
+      "version": "5.0.2"
+    },
+    "yrewrite": {
+      "repo": "yakamara/yrewrite",
+      "version": "2.12.1"
+    }
+  }
+}

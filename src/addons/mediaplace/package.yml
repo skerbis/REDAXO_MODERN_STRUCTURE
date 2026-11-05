@@ -1,0 +1,86 @@
+package: mediaplace
+version: '2.7.1'
+author: FriendsOfREDAXO
+supportpage: https://github.com/FriendsOfREDAXO
+
+page:
+    title: 'MediaPlace'
+    icon: rex-icon fa-photo-film
+    # perm: admin -- ALLE Unterseiten sind ohnehin admin- oder zumindest
+    # eingeschraenkt-gated (settings/metainfo_fields/demo/help bewusst
+    # admin-only, tag_management immerhin mediaplace[manage_tags]). Ganz
+    # ohne eigenes perm hier blieb der "MediaPlace"-Menuepunkt fuer JEDEN
+    # eingeloggten Backend-User sichtbar+anklickbar, obwohl ein Redakteur
+    # ohne admin/manage_tags dort auf jeder Unterseite abgewiesen wuerde --
+    # REDAXO versucht beim blossen Seitenaufruf (?page=mediaplace ohne
+    # Unterseite) eine zugaengliche Unterseite zu finden, findet keine und
+    # wirft "Current page ... is a main page and therefore has no sub-path"
+    # (rex_be_controller::includeCurrentPageSubPath()), statt den
+    # Menuepunkt einfach gar nicht erst anzuzeigen. Der eigentliche
+    # Medienpool-Picker (Overlay) ist davon nicht betroffen -- der laeuft
+    # ueber den separaten, umgebogenen "Medienpool"-Menuepunkt (siehe
+    # boot.php PAGES_PREPARED) und eigene MediaPermission-Checks, nicht
+    # ueber diese Admin-Seite hier.
+    perm: admin
+    subpages:
+        settings:
+            title: 'Einstellungen'
+            icon: rex-icon fa-gear
+            perm: admin
+        thumb_warmup:
+            title: 'Vorschaubilder vorwärmen'
+            icon: rex-icon fa-fire
+            perm: admin
+        ai_alt_complete:
+            title: 'ALT-Texte vervollständigen'
+            icon: rex-icon fa-wand-magic-sparkles
+            perm: admin
+        metainfo_fields:
+            title: 'Metainfo Felder'
+            icon: rex-icon fa-sliders
+            perm: admin
+        tag_management:
+            title: 'Tag-Verwaltung'
+            icon: rex-icon fa-tags
+            perm: 'mediaplace[manage_tags]'
+        demo:
+            title: 'Demo'
+            icon: rex-icon fa-play
+            perm: admin
+        help:
+            title: 'translate:help'
+            subPath: README.md
+            itemClass: 'pull-right'
+            perm: admin
+
+requires:
+    redaxo: '>=5.20'
+    php:
+        version: '>=8.4'
+    packages:
+        api: '>=1.3'
+        mediapool: '^2.13.0'
+
+console_commands:
+    mediaplace:ai-alt-complete: FriendsOfRedaxo\Mediaplace\Command\AiAltComplete
+    mediaplace:rename-work: FriendsOfRedaxo\Mediaplace\Command\MediaRenameWork
+
+default_config:
+    replace_classic_mediapool: true
+    enable_own_metadata: false
+    disable_tagging: false
+    disable_collections: false
+    enable_metainfo_editing: true
+    enable_alt_missing_filter: true
+    enable_upload_resize: false
+    upload_resize_width: 2000
+    upload_resize_height: 2000
+    video_thumb_mode: animated
+    enable_ai_alt_text: false
+    enable_ai_alt_auto_complete: false
+    ai_alt_prompt_profile: accessibility
+    ai_alt_custom_prompt: ''
+    ai_alt_platform_profile_id: 0
+    ai_alt_max_image_dimension: 1024
+    enable_ai_auto_tag: false
+    ai_auto_tag_max: 3

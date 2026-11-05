@@ -1,0 +1,10 @@
+/*
+ * imglist widget styles
+ *
+ * The REX_IMGLIST widget has been migrated to the mform-list-widget pattern.
+ * Styling is now provided by list-widget.css (--mfl-* variables, .mform-list-widget,
+ * .mform-list-widget-medialist, .is-grid-view, etc.).
+ *
+ * This file is kept for backward compatibility with third-party integrations
+ * that may reference .rex-js-widget-imglist directly.
+ */

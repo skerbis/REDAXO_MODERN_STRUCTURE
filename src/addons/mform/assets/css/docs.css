@@ -1,0 +1,58 @@
+/**
+ * MForm Docs – Sidebar/TOC + Code-Copy
+ */
+
+mark {
+    background: #ffe066;
+    color: #000;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+.mform-docs-code {
+    position: relative;
+}
+
+.mform-docs-code pre {
+    max-height: 28rem;
+    overflow: auto;
+    padding-top: 2.6rem;
+}
+
+.mform-docs-code pre.rex-code {
+    white-space: pre;
+}
+
+.mform-docs-code .btn-copy-code {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    padding: 3px 8px;
+    font-size: 12px;
+    opacity: .5;
+    transition: opacity .2s;
+    cursor: pointer;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    color: #333;
+    z-index: 10;
+}
+
+.mform-docs-code:hover .btn-copy-code {
+    opacity: 1;
+}
+
+.mform-docs-code .btn-copy-code.copied {
+    background: #5bb75b;
+    color: #fff;
+    border-color: #5bb75b;
+    opacity: 1;
+}
+
+.mform-docs-code .btn-copy-code.copy-failed {
+    background: #d9534f;
+    color: #fff;
+    border-color: #d9534f;
+    opacity: 1;
+}

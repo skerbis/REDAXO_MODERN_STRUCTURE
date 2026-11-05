@@ -1,0 +1,75 @@
+package: mform
+version: '10.0.6'
+name: MForm
+author: Friends Of REDAXO
+supportpage: https://github.com/FriendsOfREDAXO/mform
+page:
+    title: 'translate:title'
+    pjax: true
+    perm: admin[]
+    icon: rex-icon fa-diagram-next
+    subpages:
+        docs:
+            title: 'translate:docs'
+            icon: rex-icon fa-book
+        demo:
+            title: 'translate:reference_demo'
+            subpages:
+                demo_base: { title: 'translate:demo_base' }
+                demo_wrapper: { title: 'translate:demo_wrapper' }
+                demo_extended: { title: 'translate:demo_extended' }
+                demo_repeater: { title: 'translate:demo_repeater' }
+                demo_rexform: { title: 'translate:demo_rexform' }
+                demo_expert: { title: 'translate:demo_expert' }
+                demo_layout_preview: { title: 'translate:demo_layout_preview' }
+                demo_renderer_parity: { title: 'translate:demo_renderer_parity' }
+
+        formbuilder:
+            title: 'translate:formbuilder'
+            icon: rex-icon fa-grip
+
+        migration:
+            title: 'translate:migration'
+            icon: rex-icon fa-rotate
+
+        settings:
+            title: 'translate:mform_settings'
+            icon: rex-icon fa-sliders
+
+        changelog:
+            title: 'translate:changelog'
+            subPath: CHANGELOG.md
+            itemClass: pull-right
+
+default_config:
+    a11y_check: true
+    a11y_default: false
+
+console_commands:
+    mform:migrate: FriendsOfRedaxo\MForm\Console\MigrateCommand
+    mform:lint: FriendsOfRedaxo\MForm\Console\LintCommand
+
+requires:
+    php: '>=8.4'
+    redaxo: '^5.17.0'
+
+conflicts:
+    packages:
+        ui_tools: '<1.0.0'
+
+# Nicht mit ausliefern: Entwicklungs- und Test-Artefakte.
+# docs/ bleibt drin, die Doku-Seite im Backend liest daraus.
+installer_ignore:
+    - .claude
+    - .github
+    - .gitignore
+    - .php-cs-fixer.dist.php
+    - .phpunit.cache
+    - composer.json
+    - composer.lock
+    - node_modules
+    - package.json
+    - package-lock.json
+    - phpunit.xml.dist
+    - playwright.config.js
+    - tests

@@ -1,0 +1,98 @@
+# MForm – REDAXO Addon
+
+[![Static Analysis](https://github.com/FriendsOfREDAXO/mform/actions/workflows/static-analysis.yml/badge.svg?branch=main)](https://github.com/FriendsOfREDAXO/mform/actions/workflows/static-analysis.yml)
+[![PHP](https://img.shields.io/badge/PHP-8.4-777BB4?logo=php&logoColor=white)](https://github.com/FriendsOfREDAXO/mform/actions/workflows/static-analysis.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+> [!NOTE]
+> **MForm 10 is stable.** It requires PHP 8.4. For repeatable content we recommend the Flex Repeater. MBlock is no longer actively tested or considered in further development, but existing MBlock modules should keep working; the assistant under “MBlock zu Repeater” helps with the switch whenever it suits you. The 9.5.x line lives on in branch [`9.x`](https://github.com/FriendsOfREDAXO/mform/tree/9.x).
+
+![Poster](https://github.com/FriendsOfREDAXO/mform/blob/assets/screen_mform8.png?raw=true?2)
+
+MForm takes the pain out of building REDAXO module inputs. Instead of writing raw HTML form markup, everything gets defined in clean PHP — from a simple text field to fully nested, copy-paste-capable repeaters with conditional logic.
+
+Not just for modules: MForm also extends **YForm** and **rex_form** with custom widgets like the custom link field, image lists, or the ColorSwatch picker.
+
+## What MForm does
+
+- Builds module input forms via a fluent PHP API (`MForm::factory()->addTextField(...)->...->show()`)
+- Provides a **Flex Repeater** for dynamically repeatable form rows — supporting nesting, copy/paste, and per-item enable/disable
+- Keeps dropdown-based controls usable inside the **Flex Repeater** by allowing open menus to overflow their item wrapper when needed
+- Ships reusable form logic via a **Template API** (`registerTemplate`, `fromTemplate`, `applyTemplate`)
+- Adds helper classes for Repeater output: `MFormRepeaterHelper::decode()`, `filterByField()`, `sortByField()`, `groupByField()`, `limitItems()`
+- Adds YForm value types: `custom_link`, `custom_link_multi`, `color_swatch`
+- Resolves readable labels for stored dataset links like `rex-<table>://<id>` in the custom link widget when possible
+- Opens the **Linkmap** overlay for link and dataset selection and the **MediaPlace** overlay for media when those addons are installed, with the classic popups as fallback
+- **Conditional visibility** with multiple rules (`setVisibleIf`, `addVisibleIf`, `setHiddenIf`, all or any) and a **tags field** (`addTagsField`) for keywords as pills
+- Optional **accessibility check** for media fields (`'a11y' => ['med_alt']`): warns right in the widget when ALT text or other media pool metadata is missing, honours decorative images, MediaPlace and multilingual metainfo fields
+- Offers a growing library of **installable demo modules** directly from the REDAXO backend
+
+## Quick example
+
+```php
+use FriendsOfRedaxo\MForm;
+
+echo MForm::factory()
+    ->addTabElement('Content', MForm::factory()
+        ->addTextField(1, ['label' => 'Headline'])
+        ->addColorSwatchField(2, [
+            '#ffffff' => 'White',
+            '#111111' => 'Black',
+            '.bg-primary' => ['label' => 'Primary', 'preview' => '#0d6efd'],
+        ], ['label' => 'Background'])
+    )
+    ->addTabElement('Items', MForm::factory()
+        ->addRepeaterElement(3, MForm::factory()
+            ->addTextField('title', ['label' => 'Title'])
+            ->addMediaField('image', ['label' => 'Image'])
+        , true, true, ['min' => 1, 'max' => 10, 'copy_paste' => true])
+    )
+    ->show();
+```
+
+## Documentation & Tutorial
+
+The full documentation is available directly inside the REDAXO backend under **MForm → Docs**.
+
+For a step-by-step introduction, check out the **[FOR Tutorial](https://friendsofredaxo.github.io/tricks/)** section on MForm.
+
+MBlock users looking to migrate should start with [docs/08_mblock_migration.md](docs/08_mblock_migration.md).
+
+For component-driven frontend output, see [docs/14_fragments_output.md](docs/14_fragments_output.md).
+
+## Installation
+
+Install directly via the REDAXO Installer — search for `mform`, download and activate.
+
+## License
+
+[MIT License](LICENSE.md)
+
+## Credits
+
+**Project Lead**
+
+[Joachim Dörr](https://github.com/joachimdoerr)
+
+[Thomas Skerbis](https://github.com/skerbis)
+
+---
+
+Thanks to all [contributors](https://github.com/FriendsOfREDAXO/mform/graphs/contributors) who helped shape MForm over the years!
+
+**Top contributors**
+
+| | Contributor |
+|---|---|
+| 1 | [ynamite](https://github.com/ynamite) |
+| 2 | [marcohanke](https://github.com/marcohanke) |
+| 3 | [eaCe](https://github.com/eaCe) |
+| 4 | [schuer](https://github.com/schuer) |
+| 5 | [dtpop](https://github.com/dtpop) |
+| 6 | [IngoWinter](https://github.com/IngoWinter) |
+| 7 | [thorol](https://github.com/thorol) |
+| 8 | [DanielWeitenauer](https://github.com/DanielWeitenauer) |
+
+A big thank you also to [interweave-media](https://github.com/interweave-media), [olien](https://github.com/olien), [elricco](https://github.com/elricco), [staabm](https://github.com/staabm), [ascky-thorben](https://github.com/ascky-thorben), [dpf-dd](https://github.com/dpf-dd), [nandes2062](https://github.com/nandes2062), [dgrothaus-mc](https://github.com/dgrothaus-mc), [lexplatt](https://github.com/lexplatt), [danspringer](https://github.com/danspringer), [Geri2017](https://github.com/Geri2017), [omphteliba](https://github.com/omphteliba), [bitshiftersgmbh](https://github.com/bitshiftersgmbh), [TobiasKrais](https://github.com/TobiasKrais), [VIEWSION](https://github.com/VIEWSION), [christophboecker](https://github.com/christophboecker), [cukabeka](https://github.com/cukabeka) and [philippparth](https://github.com/philippparth).
+
+**A [Friends Of REDAXO](https://github.com/FriendsOfREDAXO) project**
